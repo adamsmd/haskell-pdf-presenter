@@ -4,6 +4,7 @@ module Main where
 --import Control.Concurrent.STM
 import Control.Concurrent
 import Control.Monad
+import Control.Monad.Trans
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, fromJust)
 import Data.IORef
@@ -16,7 +17,7 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.Gdk.GC (gcNew)
 import Graphics.UI.Gtk.Poppler.Document
 import Graphics.UI.Gtk.Poppler.Page
-import Graphics.UI.Gtk.Poppler.Annot
+--import Graphics.UI.Gtk.Poppler.Annot
 --import Graphics.UI.Gtk.Windows.Window
 import System.Console.GetOpt
 import System.Glib
@@ -82,6 +83,8 @@ page_get_mapping_annotation
 
 -- does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
 -- what would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
+
+-- page numbers on each tile in tile view
 
 -- adjust ending time
 -- adjust durration
@@ -218,12 +221,14 @@ guiMain file = do
      -- Meta-data
      do metaBox <- hBoxNew False 0
         boxPackEnd windowBox metaBox PackNatural 0
-   
+
+        -- Current time
         time <- labelNew Nothing
         set time [labelAttributes := [AttrSize 0 (negate 1) 40]]
         timeoutAdd (liftM endTime (readIORef state) >>= displayTime time >> return True) 100
         boxPackStart metaBox time PackRepel 0
 
+        -- Current slide number
         slideNum <- entryNew
         slideNum `set` [entryHasFrame := False]
         pc <- widgetGetPangoContext slideNum
@@ -235,44 +240,36 @@ guiMain file = do
         --entrySetNumeric slideNum True
         widgetModifyBg slideNum StateNormal (Color 0 0 0)
         boxPackStart metaBox slideNum PackNatural 0
-        --page `on` value
-        page `onValueChanged` (get page adjustmentValue >>= entrySetText slideNum . show . round)
-        slideNum `onEditableChanged` (slideNum `set` [entryText :~ filter (isDigit)])
+        --page `onValueChanged` (get page adjustmentValue >>= entrySetText slideNum . show . round)
+        slideNum `set` [widgetCanFocus := False, entryEditable := False]
+        --slideNum `onEditableChanged` (slideNum `set` [entryText :~ filter (isDigit)])
 {-
         slideNum `onInsertText` \s p -> if False && all isDigit s
                                         then editableInsertText slideNum s p >> return (length s + p)
                                         else return p
 -}
-        slideNum `onEntryActivate` (slideNum `get` entryText >>= \text -> page `set` [adjustmentValue := read text])
-
-
-{-
-        slideNum <- spinButtonNew page 1 0
-        slideNum `set` [entryHasFrame := False]
-        pc <- widgetGetPangoContext slideNum
-        fd <- contextGetFontDescription pc
-        fontDescriptionSetSize fd 40
-        widgetModifyFont slideNum (Just fd)
-        widgetModifyBase slideNum StateNormal (Color 0 0 0)
-        entrySetAlignment slideNum 1
-        --entrySetMaxLength slideNum 5 -- TODO: make it dynamic based on slide count
-        --entrySetWidthChars
-        spinButtonSetNumeric slideNum True
-        --contextSetFontDescription pc fd
-        --entrySetWidthChars
-        widgetModifyBg slideNum StateNormal (Color (64*256) (64*256) (64*256))
-        boxPackStart metaBox slideNum PackNatural 0
--}
-
-        slide <- labelNew Nothing
-        set slide [labelAttributes := [AttrSize 0 (negate 1) 40]]
+        slideNum `on` buttonReleaseEvent $ lift $ do
+          dialog <- messageDialogNew (Just window) [DialogModal, DialogDestroyWithParent] MessageQuestion ButtonsOkCancel ""
+          box <- dialogGetUpper dialog
+          entry <- spinButtonNewWithRange 1 95 1 -- TODO: right align
+          text <- labelNew (Just "Goto slide (of 95):") -- TODO: "of"
+          messageDialogSetImage dialog text
+          entry `on` entryActivate $ dialogResponse dialog ResponseOk
+          boxPackStart box entry PackNatural 0
+          widgetShowAll dialog
+          r <- dialogRun dialog
+          value <- entry `get` spinButtonValue
+          putStrLn $ "V:" ++ show value
+          when (r == ResponseOk) $ page `set` [adjustmentValue := value]
+          putStrLn (show r)
+          widgetDestroy dialog
+          return False
+        
         let update = do p <- liftM round $ get page adjustmentValue
                         n <- liftM round $ get page adjustmentUpper
-                        set page [adjustmentValue := fromIntegral (max 1 (min p n))]
-                        set slide [labelText := "/" ++ show n]
-          in do --page `onValueChanged` update
+                        set slideNum [entryText := show p ++ "/" ++ show n]
+          in do page `onValueChanged` update
                 page `onAdjChanged` update
-        boxPackStart metaBox slide PackNatural 0
 
   tops <- windowListToplevels
   putStrLn $ show (length tops)
