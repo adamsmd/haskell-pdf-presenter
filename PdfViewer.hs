@@ -104,18 +104,20 @@ data TimerState = Counting GTimeVal | Paused Int{-seconds-}
 
 data Blanking = BlankNone | BlankBlack | BlankWhite
 data State = State
- { endTime :: GTimeVal -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
- , blanking :: Blanking
- , documentURL :: String
+ { endTime :: IORef GTimeVal -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
+ , blanking :: IORef Blanking
+ , documentURL :: IORef String -- TODO: Maybe
  -- split ratio
  -- switch screens
-}
-
-data ThreadingInfo = ThreadingInfo
- { views :: IORef (Map.Map Widget (Int{-width-}, Int{-height-}))
+ , views :: IORef (Map.Map Widget (Int{-width-}, Int{-height-}))
  , document :: IORef (Maybe Document)
  , pages :: IORef (Map.Map (Int{-width-}, Int{-height-}) (Map.Map Int{-page number-} Pixmap{-cached page-}))
- }
+ , pageAdjustment :: Adjustment {- immutable -}
+ , topNotebook :: Notebook
+ , presenterPaned :: HPaned
+}
+
+data GuiState = GuiState {}
 
 options = []
 
@@ -134,15 +136,20 @@ guiMain :: FilePath -> IO ()
 guiMain file = do
   -- Shared state
   state <- do
-    startTime <- gGetCurrentTime
-    newIORef (State { blanking = BlankNone, endTime = startTime, documentURL = "file://"++file })
-  page <- adjustmentNew 0 0 0 1 10 1
-  threadingInfo <- do
-    viewers <- newIORef (Map.empty :: Map.Map Widget (Int{-width-}, Int{-height-}))
-    doc <- newIORef Nothing
-    cache <- newIORef (Map.fromList [] :: Map.Map (Int, Int) (Map.Map Int Pixmap))
-    return $ ThreadingInfo { views = viewers, document = doc, pages = cache }
+    page <- adjustmentNew 0 0 0 1 10 1
+    top <- notebookNew -- TODO: belongs in state
+    presenter <- hPanedNew -- TODO: belongs in state
+    blankingRef <- newIORef BlankNone
+    endTimeRef <- newIORef =<< gGetCurrentTime
+    documentURLRef <- newIORef ("file://"++file)
+    viewsRef <- newIORef Map.empty
+    documentRef <- newIORef Nothing
+    pagesRef <- newIORef Map.empty
+    return $ State { blanking = blankingRef, endTime = endTimeRef, documentURL = documentURLRef
+                   , views = viewsRef, document = documentRef, pages = pagesRef
+                   , pageAdjustment = page, topNotebook = top, presenterPaned = presenter }
 
+{-
   Just display <- displayGetDefault
   nscreens <- displayGetNScreens display
   putStrLn $ "NScreens:"++show nscreens
@@ -150,25 +157,23 @@ guiMain file = do
   nmonitors <- screenGetNMonitors screen
   putStrLn $ "NMonitors:"++show nmonitors
   --Rectangle x y width height <- screenGetMonitorGeometry screen 1
-
-  top <- notebookNew
-  presenter <- hPanedNew
+-}
 
   -------------------
   -- Audience window
   -------------------
-  do window <- makeWindow page presenter top threadingInfo state
-     view <- makeView threadingInfo page id
+  do window <- makeWindow state
+     view <- makeView state id
      window `containerAdd` view
 
   -------------------
   -- Presenter window
   -------------------
-  do window <- makeWindow page presenter top threadingInfo state
+  do window <- makeWindow state
      windowBox <- vBoxNew False 0
      window `containerAdd` windowBox
-     set top [notebookShowBorder := False, notebookShowTabs := False]
-     boxPackStart windowBox top PackGrow 0
+     topNotebook state `set` [notebookShowBorder := False, notebookShowTabs := False]
+     boxPackStart windowBox (topNotebook state) PackGrow 0
 
      -- Views
 -- NOTE: for some odd reason, this crashes if we add the scrolled second
@@ -177,7 +182,7 @@ guiMain file = do
            scrolled <- scrolledWindowNew Nothing Nothing
            --windowBox `containerAdd` scrolled
            layout <- layoutNew Nothing Nothing
-           notebookInsertPage top scrolled "3" 1
+           notebookInsertPage (topNotebook state) scrolled "3" 1
            scrolled `containerAdd` layout
    
            let recomputeViews = do
@@ -185,14 +190,14 @@ guiMain file = do
                  mapM (containerRemove layout :: DrawingArea -> IO ()) thumbnails'
            
                  (totalWidth, _) <- widgetGetSize window --scrolled
-                 numPages <- get page adjustmentUpper
+                 numPages <- pageAdjustment state `get` adjustmentUpper
                  let width = totalWidth `div` 4
                      height = width * 3 `div` 4
                      numRows = round numPages `div` 4 + 1
                  putStrLn $ "RECOMPUTING" ++ show (numPages, totalWidth, width, height, numRows)
                  layoutSetSize layout totalWidth (height*numRows)
                  newThumbnails <- sequence [ do
-                   view <- makeView threadingInfo page (const (4*row+col+1))
+                   view <- makeView state (const (4*row+col+1))
                    widgetSetSizeRequest view width height
                    layoutPut layout view (col*width) (row*height)
                    --putStrLn $ "X"++ show (row,col,width,height,row*height,col*width)
@@ -202,19 +207,19 @@ guiMain file = do
                  () <- atomicWriteIORef thumbnails newThumbnails
                  return ()
    
-           page `onAdjChanged` recomputeViews
+           pageAdjustment state `onAdjChanged` recomputeViews
            --page `onValueChanged` changeHilight
            window `on` configureEvent $ liftIO recomputeViews >> return False
            --onZoom $ recocmputeViews
-           page `onValueChanged` (containerRemove windowBox presenter >> boxPackStart windowBox scrolled PackGrow 0)
+           pageAdjustment state `onValueChanged` (containerRemove windowBox (presenterPaned state) >> boxPackStart windowBox scrolled PackGrow 0)
 
         do --presenter <- vBoxNew False 0
            --boxPackStart windowBox presenter PackGrow 0
-           notebookAppendPage top presenter "1"
-           view1 <- makeView threadingInfo page id
-           view2 <- makeView threadingInfo page (+1)
-           panedPack1 presenter view1 True True
-           panedPack2 presenter view2 True True
+           notebookAppendPage (topNotebook state) (presenterPaned state) "1"
+           view1 <- makeView state id
+           view2 <- makeView state (+1)
+           panedPack1 (presenterPaned state) view1 True True
+           panedPack2 (presenterPaned state) view2 True True
 
         return ()
 
@@ -225,7 +230,7 @@ guiMain file = do
         -- Current time
         time <- labelNew Nothing
         set time [labelAttributes := [AttrSize 0 (negate 1) 40]]
-        timeoutAdd (liftM endTime (readIORef state) >>= displayTime time >> return True) 100
+        timeoutAdd (readIORef (endTime state) >>= displayTime time >> return True) 100
         boxPackStart metaBox time PackRepel 0
 
         -- Current slide number
@@ -260,32 +265,32 @@ guiMain file = do
           r <- dialogRun dialog
           value <- entry `get` spinButtonValue
           putStrLn $ "V:" ++ show value
-          when (r == ResponseOk) $ page `set` [adjustmentValue := value]
+          when (r == ResponseOk) $ (pageAdjustment state) `set` [adjustmentValue := value]
           putStrLn (show r)
           widgetDestroy dialog
           return False
         
-        let update = do p <- liftM round $ get page adjustmentValue
-                        n <- liftM round $ get page adjustmentUpper
-                        set slideNum [entryText := show p ++ "/" ++ show n]
-          in do page `onValueChanged` update
-                page `onAdjChanged` update
+        let update = do p <- liftM round $ get (pageAdjustment state) adjustmentValue
+                        n <- liftM round $ get (pageAdjustment state) adjustmentUpper
+                        slideNum `set` [entryText := show p ++ "/" ++ show n]
+          in do (pageAdjustment state) `onValueChanged` update
+                (pageAdjustment state) `onAdjChanged` update
 
   tops <- windowListToplevels
   putStrLn $ show (length tops)
 
   -- Show windows, fork the rendering thread, and start main loop
   windowListToplevels >>= mapM_ widgetShowAll
-  liftIO $ forkIO $ renderThread page presenter threadingInfo state
+  liftIO $ forkIO $ renderThread state
   mainGUI
 
-makeWindow adjustment paned top threadingInfo state = do
+makeWindow state = do
   window <- windowNew
   windowFullscreen window
   widgetModifyBg window StateNormal (Color 0 0 0)
   window `onDestroy` mainQuit
-  adjustment `onValueChanged` widgetQueueDraw window
-  adjustment `onAdjChanged` widgetQueueDraw window -- ensures page counter is updated
+  pageAdjustment state `onValueChanged` widgetQueueDraw window
+  pageAdjustment state `onAdjChanged` widgetQueueDraw window -- ensures page counter is updated
   window `on` keyPressEvent $ do
      mods <- eventModifier
      name <- eventKeyName
@@ -294,36 +299,36 @@ makeWindow adjustment paned top threadingInfo state = do
     -- TODO: left and right mouse click for forward and backward
     handleResponce dialog ResponseOk = do
       (uri : _) <- fileChooserGetURIs dialog
-      () <- atomicModifyIORef state (\x -> (x { documentURL = uri }, ()))
-      putStrLn "NEWFILE"
-      () <- atomicWriteIORef (document threadingInfo) Nothing
-      --() <- atomicWriteIORef (pages threadingInfo) Map.empty
+      -- Note ordering to maintain thread safety
+      () <- atomicWriteIORef (documentURL state) uri
+      () <- atomicWriteIORef (document state) Nothing
+      -- Pages will be reloaded by render thread
       widgetDestroy dialog
     handleResponce dialog _ = widgetDestroy dialog
     handleKey :: [Modifier] -> String -> IO Bool
     handleKey [Graphics.UI.Gtk.Control] "q" = mainQuit >> return True
     handleKey [] key | key `elem` ["Left", "Up", "Page_Up", "BackSpace"] =
-      adjustment `set` [adjustmentValue :~ (+(negate 1))] >> return True
+      pageAdjustment state `set` [adjustmentValue :~ (+(negate 1))] >> return True
     handleKey [] key | key `elem` ["Right", "Down", "Page_Down", "Right", "space", "Return"] =
-      adjustment `set` [adjustmentValue :~ (+1)] >> return True
-    handleKey [] "Home" = adjustment `set` [adjustmentValue := 0] >> return True
-    handleKey [] "End" = adjustment `get` adjustmentUpper >>= \p -> adjustment `set` [adjustmentValue := p] >> return True
-    handleKey [] "Tab" = set top [notebookCurrentPage :~ (`mod` 2) . (+ 1)] >> return True
-    handleKey [] "r" = atomicWriteIORef (document threadingInfo) Nothing >>= \() -> return True
-    handleKey [] "bracketleft" = paned `set` [panedPosition :~ max 0 . (+(negate 20))] >> return True
-    handleKey [] "bracketright" = paned `set` [panedPosition :~ (+20)] >> return True
-    handleKey [Shift] "braceleft" = paned `set` [panedPosition :~ max 0 . (+(negate 1))] >> return True
-    handleKey [Shift] "braceright" = paned `set` [panedPosition :~ (+1)] >> return True
+      pageAdjustment state `set` [adjustmentValue :~ (+1)] >> return True
+    handleKey [] "Home" = pageAdjustment state `set` [adjustmentValue := 0] >> return True
+    handleKey [] "End" = pageAdjustment state `get` adjustmentUpper >>= \p -> pageAdjustment state `set` [adjustmentValue := p] >> return True
+    handleKey [] "Tab" = topNotebook state `set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)] >> return True
+    handleKey [] "r" = atomicWriteIORef (document state) Nothing >>= \() -> return True
+    handleKey [] "bracketleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 20))] >> return True
+    handleKey [] "bracketright" = presenterPaned state `set` [panedPosition :~ (+20)] >> return True
+    handleKey [Shift] "braceleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 1))] >> return True
+    handleKey [Shift] "braceright" = presenterPaned state `set` [panedPosition :~ (+1)] >> return True
     handleKey [Graphics.UI.Gtk.Control] "o" = do
         dialog <- fileChooserDialogNew Nothing Nothing FileChooserActionOpen [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
         dialog `on` response $ handleResponce dialog
         widgetShowAll dialog
 --fileChooserAddFilter :: FileChooserClass self => self -> FileFilter -> IO ()
         return True
-    handleKey [] "x" = do doc <- readIORef (document threadingInfo)
+    handleKey [] "x" = do doc <- readIORef (document state)
                           case doc of
                             Nothing -> return True
-                            Just doc -> panedStops paned doc >> return True
+                            Just doc -> panedStops (presenterPaned state) doc >> return True
     handleKey mods name = (putStrLn $ "KeyEvent:"++show mods ++ name) >> return False
 
 panedStops paned document = do
@@ -334,22 +339,22 @@ panedStops paned document = do
   let newPos = (fromIntegral panedHeight) * pageWidth / pageHeight
   paned `set` [panedPosition := maxPos - round newPos]
 
-makeView :: ThreadingInfo -> Adjustment -> (Int -> Int) -> IO DrawingArea
-makeView threadingInfo page offset = do
+makeView :: State -> (Int -> Int) -> IO DrawingArea
+makeView state offset = do
   area <- drawingAreaNew
   widgetModifyBg area StateNormal (Color 0 0 0)
   area `on` exposeEvent $ tryEvent $ do
-    n <- liftIO (liftM round $ get page adjustmentUpper)
-    p <- liftIO (liftM (offset . round) $ get page adjustmentValue)
+    n <- liftIO (liftM round $ get (pageAdjustment state) adjustmentUpper)
+    p <- liftIO (liftM (offset . round) $ get (pageAdjustment state) adjustmentValue)
     when (p <= n && p >= 1) $ do
       drawWindow <- eventWindow
       size <- liftIO $ widgetGetSize area
-      cache' <- liftIO $ readIORef (pages threadingInfo)
+      cache' <- liftIO $ readIORef (pages state)
       gc <- liftIO $ gcNew drawWindow
       case Map.lookup p $ Map.findWithDefault Map.empty size cache' of
         Nothing -> do
           pc <- liftIO $ widgetGetPangoContext area
-          doc <- liftIO $ readIORef (document threadingInfo)
+          doc <- liftIO $ readIORef (document state)
           layout <- liftIO $ layoutText pc $
             case doc of
               Nothing -> "Loading file..." -- TODO: filename
@@ -365,7 +370,7 @@ makeView threadingInfo page offset = do
           liftIO $ drawDrawable drawWindow gc pixmap 0 0 ((width - width') `div` 2) ((height - height') `div` 2) width height
   area `on` configureEvent $ tryEvent $ do
     (width, height) <- eventSize
-    () <- liftIO $ atomicModifyIORef (views threadingInfo) (\x -> (Map.insert (castToWidget area) (width, height) x, ()))
+    () <- liftIO $ atomicModifyIORef (views state) (\x -> (Map.insert (castToWidget area) (width, height) x, ()))
     return ()
   return area
 
@@ -399,33 +404,33 @@ displayTime label ({-Just-} time) = do
 -- with postGUISync.
 
 --renderThread :: Adjustment -> HPaned -> ThreadingInfo -> IORef State -> IO ()
-renderThread adjustment paned threadingInfo state = sequence_ $ repeat loop where
+renderThread state = sequence_ $ repeat loop where
   loop = do
     threadDelay 1000 -- Keeps the GUI responsive
-    state' <- readIORef state
-    oldDoc <- readIORef (document threadingInfo)
+    documentURL <- readIORef (documentURL state)
+    oldDoc <- readIORef (document state)
 
     -- Note that we do exactly one postGUISync in each branch.  This may improve GUI responsiveness
     (doc, currPage, numPages) <- case oldDoc of
       Just doc -> do (currPages, numPages) <- postGUISync $ do
-                       n <- get adjustment adjustmentUpper
-                       c <- get adjustment adjustmentValue
+                       n <- pageAdjustment state `get` adjustmentUpper
+                       c <- pageAdjustment state `get` adjustmentValue
                        return (round c, round n)
                      return (doc, currPages, numPages)
-      Nothing -> do doc <- catchGError (documentNewFromFile (documentURL state') Nothing)
+      Nothing -> do doc <- catchGError (documentNewFromFile documentURL Nothing)
                              (\x -> putStrLn ("---"++(show x)) >> return Nothing)
                     case doc of
                       Nothing -> error "Exit"
                       Just doc -> do
-                        title <- get doc documentTitle
+                        title <- doc `get` documentTitle
                         numPages <- documentGetNPages doc
                         currPage <- postGUISync $ do
                           -- TODO: URL basename if title is empty
                           windowListToplevels >>= mapM (flip windowSetTitle (title ++ " - PDF Presenter"))
-                          set adjustment [adjustmentLower := 1, adjustmentUpper := fromIntegral numPages, adjustmentValue :~ (+0)]
-                          liftM round $ get adjustment adjustmentValue
-                        () <- atomicWriteIORef (pages threadingInfo) Map.empty
-                        () <- atomicWriteIORef (document threadingInfo) (Just doc)
+                          pageAdjustment state `set` [adjustmentLower := 1, adjustmentUpper := fromIntegral numPages, adjustmentValue :~ (+0)]
+                          liftM round $ pageAdjustment state `get` adjustmentValue
+                        () <- atomicWriteIORef (pages state) Map.empty
+                        () <- atomicWriteIORef (document state) (Just doc)
                         return (doc, currPage, numPages)
 
     --postGUISync $ panedStops paned doc
@@ -433,8 +438,8 @@ renderThread adjustment paned threadingInfo state = sequence_ $ repeat loop wher
     --putStrLn $ "FOO:" ++ show x
 
     -- Sizes of the views
-    views <- readIORef (views threadingInfo)
-    cache <- liftM (Map.filterWithKey (\k a -> k `elem` Map.elems views)) $ readIORef (pages threadingInfo)
+    views <- readIORef (views state)
+    cache <- liftM (Map.filterWithKey (\k a -> k `elem` Map.elems views)) $ readIORef (pages state)
     case [(size,page) |
           page <- sortBy (comparing (\i -> max (i - currPage) (2 * (currPage - i)))) [1..numPages],
           size <- sortBy (flip compare) $ nub $ Map.elems views,
@@ -466,7 +471,7 @@ renderThread adjustment paned threadingInfo state = sequence_ $ repeat loop wher
           time' <- gGetCurrentTime
           --putStrLn $ "SETTING:"++show(width,height,pageNum, formatTime time' (endTime state'))
           -- TODO: filter out unused sizes
-          () <- atomicModifyIORef (pages threadingInfo) (\x -> (Map.unionWith Map.union (Map.singleton (width,height) (Map.singleton pageNum pixmap)) x, ()))
+          () <- atomicModifyIORef (pages state) (\x -> (Map.unionWith Map.union (Map.singleton (width,height) (Map.singleton pageNum pixmap)) x, ()))
           windowListToplevels >>= mapM_ widgetQueueDraw
 
 
