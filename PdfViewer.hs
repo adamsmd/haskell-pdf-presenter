@@ -14,7 +14,7 @@ import Graphics.Rendering.Cairo
 import Graphics.Rendering.Cairo.Types
 --import Graphics.Rendering.Pango
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.Gdk.GC (gcNew)
+import Graphics.UI.Gtk.Gdk.GC (gcNew, gcGetValues, gcSetValues, foreground, lineWidth)
 import Graphics.UI.Gtk.Poppler.Document
 import Graphics.UI.Gtk.Poppler.Page
 --import Graphics.UI.Gtk.Poppler.Annot
@@ -163,7 +163,7 @@ guiMain file = do
   -- Audience window
   -------------------
   do window <- makeWindow state
-     view <- makeView state id
+     view <- makeView state id False
      window `containerAdd` view
 
   -------------------
@@ -177,47 +177,40 @@ guiMain file = do
 
      -- Views
 -- NOTE: for some odd reason, this crashes if we add the scrolled second
-     do do thumbnails <- newIORef []
-       
-           scrolled <- scrolledWindowNew Nothing Nothing
+     do do scrolled <- scrolledWindowNew Nothing Nothing
            --windowBox `containerAdd` scrolled
            layout <- layoutNew Nothing Nothing
            notebookInsertPage (topNotebook state) scrolled "3" 1
            scrolled `containerAdd` layout
+           oldWidth <- newIORef 0
    
-           let recomputeViews = do
-                 thumbnails' <- readIORef thumbnails
-                 mapM (containerRemove layout :: DrawingArea -> IO ()) thumbnails'
-           
-                 (totalWidth, _) <- widgetGetSize window --scrolled
-                 numPages <- pageAdjustment state `get` adjustmentUpper
-                 let width = totalWidth `div` 4
-                     height = width * 3 `div` 4
-                     numRows = round numPages `div` 4 + 1
-                 putStrLn $ "RECOMPUTING" ++ show (numPages, totalWidth, width, height, numRows)
-                 layoutSetSize layout totalWidth (height*numRows)
-                 newThumbnails <- sequence [ do
-                   view <- makeView state (const (4*row+col+1))
-                   widgetSetSizeRequest view width height
-                   layoutPut layout view (col*width) (row*height)
-                   --putStrLn $ "X"++ show (row,col,width,height,row*height,col*width)
-                   widgetShowAll view
-                   return view
-                   | row <- [0..numRows-1], col <- [0..3]]
-                 () <- atomicWriteIORef thumbnails newThumbnails
-                 return ()
+           let recomputeViews (Graphics.UI.Gtk.Rectangle _ _ newWidth _) = do
+                 oldWidth' <- readIORef oldWidth
+                 when (oldWidth' /= newWidth) $ do -- Keep from looping forever
+                   containerForeach layout (containerRemove layout)
+                   numPages <- pageAdjustment state `get` adjustmentUpper
+                   let width = newWidth `div` 4
+                       height = width * 3 `div` 4
+                       numRows = round numPages `div` 4 + 1
+                   putStrLn $ "RECOMPUTING THUMBS" ++ show (numPages, newWidth, width, height, numRows)
+                   layoutSetSize layout newWidth (height*numRows)
+                   () <- sequence_ [ do
+                     view <- makeView state (const (4*row+col+1)) True
+                     widgetSetSizeRequest view width height
+                     layoutPut layout view (col*width) (row*height)
+                     | row <- [0..numRows-1], col <- [0..3]]
+                   widgetShowAll layout
+                   writeIORef oldWidth newWidth
+                   return ()
    
-           pageAdjustment state `onAdjChanged` recomputeViews
-           --page `onValueChanged` changeHilight
-           window `on` configureEvent $ liftIO recomputeViews >> return False
+           layout `onSizeAllocate` recomputeViews
            --onZoom $ recocmputeViews
-           pageAdjustment state `onValueChanged` (containerRemove windowBox (presenterPaned state) >> boxPackStart windowBox scrolled PackGrow 0)
 
         do --presenter <- vBoxNew False 0
            --boxPackStart windowBox presenter PackGrow 0
            notebookAppendPage (topNotebook state) (presenterPaned state) "1"
-           view1 <- makeView state id
-           view2 <- makeView state (+1)
+           view1 <- makeView state id False
+           view2 <- makeView state (+1) False
            panedPack1 (presenterPaned state) view1 True True
            panedPack2 (presenterPaned state) view2 True True
 
@@ -275,9 +268,6 @@ guiMain file = do
                         slideNum `set` [entryText := show p ++ "/" ++ show n]
           in do (pageAdjustment state) `onValueChanged` update
                 (pageAdjustment state) `onAdjChanged` update
-
-  tops <- windowListToplevels
-  putStrLn $ show (length tops)
 
   -- Show windows, fork the rendering thread, and start main loop
   windowListToplevels >>= mapM_ widgetShowAll
@@ -339,13 +329,15 @@ panedStops paned document = do
   let newPos = (fromIntegral panedHeight) * pageWidth / pageHeight
   paned `set` [panedPosition := maxPos - round newPos]
 
-makeView :: State -> (Int -> Int) -> IO DrawingArea
-makeView state offset = do
+makeView :: State -> (Int -> Int) -> Bool -> IO DrawingArea
+makeView state offset border = do
   area <- drawingAreaNew
   widgetModifyBg area StateNormal (Color 0 0 0)
   area `on` exposeEvent $ tryEvent $ do
-    n <- liftIO (liftM round $ get (pageAdjustment state) adjustmentUpper)
-    p <- liftIO (liftM (offset . round) $ get (pageAdjustment state) adjustmentValue)
+    --liftIO $ when border $ area `set` [widgetState := StateActive]
+    n <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentUpper
+    selectedPage <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentValue
+    let p = offset selectedPage
     when (p <= n && p >= 1) $ do
       drawWindow <- eventWindow
       size <- liftIO $ widgetGetSize area
@@ -368,6 +360,10 @@ makeView state offset = do
           (width, height) <- liftIO $ drawableGetSize drawWindow
           (width', height') <- liftIO $ drawableGetSize pixmap
           liftIO $ drawDrawable drawWindow gc pixmap 0 0 ((width - width') `div` 2) ((height - height') `div` 2) width height
+          color <- liftIO $ widgetGetStyle area >>= flip styleGetBackground StateSelected
+          liftIO $ gcGetValues gc >>= \v -> gcSetValues gc (v { foreground = color, lineWidth = 6 })
+          liftIO $ when (border && p == selectedPage) $
+                 drawRectangle drawWindow gc False 0 0 width height
   area `on` configureEvent $ tryEvent $ do
     (width, height) <- eventSize
     () <- liftIO $ atomicModifyIORef (views state) (\x -> (Map.insert (castToWidget area) (width, height) x, ()))
