@@ -183,28 +183,40 @@ guiMain file = do
            notebookInsertPage (topNotebook state) scrolled "3" 1
            scrolled `containerAdd` layout
            oldWidth <- newIORef 0
-   
+           heightRef <- newIORef 0
+           let columns = 4
+
+           -- Recompute when the view size changes
            let recomputeViews (Graphics.UI.Gtk.Rectangle _ _ newWidth _) = do
                  oldWidth' <- readIORef oldWidth
                  when (oldWidth' /= newWidth) $ do -- Keep from looping forever
                    containerForeach layout (containerRemove layout)
                    numPages <- pageAdjustment state `get` adjustmentUpper
-                   let width = newWidth `div` 4
-                       height = width * 3 `div` 4
-                       numRows = round numPages `div` 4 + 1
+                   let width = newWidth `div` columns
+                       height = width * 3 `div` columns
+                       numRows = round numPages `div` columns + 1
                    putStrLn $ "RECOMPUTING THUMBS" ++ show (numPages, newWidth, width, height, numRows)
                    layoutSetSize layout newWidth (height*numRows)
                    () <- sequence_ [ do
-                     view <- makeView state (const (4*row+col+1)) True
+                     view <- makeView state (const (columns*row+col+1)) True
                      widgetSetSizeRequest view width height
                      layoutPut layout view (col*width) (row*height)
                      | row <- [0..numRows-1], col <- [0..3]]
+                   writeIORef heightRef height
                    widgetShowAll layout
                    writeIORef oldWidth newWidth
                    return ()
-   
            layout `onSizeAllocate` recomputeViews
            --onZoom $ recocmputeViews
+
+           -- Scroll to keep the current slide visible
+           adjustment <- scrolledWindowGetVAdjustment scrolled
+           let update = do p <- liftM round $ get (pageAdjustment state) adjustmentValue
+                           let row = (p-1) `div` columns
+                           height <- readIORef heightRef
+                           adjustmentClampPage adjustment (fromIntegral $ row*height) (fromIntegral $ row*height+height)
+           (pageAdjustment state) `onValueChanged` update
+           (pageAdjustment state) `onAdjChanged` update
 
         do --presenter <- vBoxNew False 0
            --boxPackStart windowBox presenter PackGrow 0
