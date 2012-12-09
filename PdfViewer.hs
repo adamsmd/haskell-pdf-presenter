@@ -346,7 +346,6 @@ makeView state offset border = do
   area <- drawingAreaNew
   widgetModifyBg area StateNormal (Color 0 0 0)
   area `on` exposeEvent $ tryEvent $ do
-    --liftIO $ when border $ area `set` [widgetState := StateActive]
     n <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentUpper
     selectedPage <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentValue
     let p = offset selectedPage
@@ -362,7 +361,7 @@ makeView state offset border = do
           layout <- liftIO $ layoutText pc $
             case doc of
               Nothing -> "Loading file..." -- TODO: filename
-              Just _  -> "Loading slide "++show p++" of "++show n++"..."
+              Just _  -> "Rendering slide "++show p++" of "++show n++"..."
           liftIO $ layoutSetAttributes layout [AttrForeground 0 (negate 1) (Color 65535 65535 65535),
                                                AttrWeight 0 (negate 1) WeightBold,
                                                AttrSize 0 (negate 1) 24]
