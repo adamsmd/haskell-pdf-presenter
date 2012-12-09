@@ -149,9 +149,13 @@ guiMain file = do
                    putStrLn $ "RECOMPUTING THUMBS" ++ show (numPages, newWidth, width, height, numRows)
                    layoutSetSize layout newWidth (height*numRows)
                    () <- sequence_ [ do
-                     view <- makeView state (const (columns*row+col+1)) True
+                     let page = columns*row+col+1
+                     view <- makeView state (const page) True
                      widgetSetSizeRequest view width height
                      layoutPut layout view (col*width) (row*height)
+                     view `widgetAddEvents` [ButtonPressMask, ButtonReleaseMask]
+                     view `on` buttonReleaseEvent $ tryEvent $
+                          liftIO $ pageAdjustment state `set` [adjustmentValue := fromIntegral page]
                      | row <- [0..numRows-1], col <- [0..3]]
                    writeIORef heightRef height
                    widgetShowAll layout
