@@ -1,0 +1,34 @@
+-- Get the current number of screens and monitors
+{-
+  Just display <- displayGetDefault
+  nscreens <- displayGetNScreens display
+  putStrLn $ "NScreens:"++show nscreens
+  Just screen <- screenGetDefault
+  nmonitors <- screenGetNMonitors screen
+  putStrLn $ "NMonitors:"++show nmonitors
+  --Rectangle x y width height <- screenGetMonitorGeometry screen 1
+-}
+
+
+
+-- Get annotations from PDF
+        --putStrLn "ANNOTS"
+        --annotMappings <- pageGetAnnotMapping page
+        --mapM (\(PopplerAnnotMapping area annot) -> do
+        --        putStrLn $ show area
+        --        putStrLn "BEGIN"
+        --        text <- annotGetContents annot
+        --        putStrLn "MID"
+        --        putStrLn $ show text
+        --        putStrLn "END"
+        --        ) annotMappings
+
+-- Info about windows
+--windowPresent :: WindowClass self => self -> IO ()
+--windowSetScreen
+--windowScreen :: WindowClass self => Attr self Screen
+  --size <- drawableGetSize (castToDrawable window)
+  --Just screen <- screenGetDefault
+  --Rectangle _ _ width height <- screenGetMonitorGeometry screen 0
+--widgetSetSizeRequest area (truncate width) (truncate height)
+--windowSetPosition window WinPosCenter

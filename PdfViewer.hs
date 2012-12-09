@@ -33,7 +33,7 @@ atomicWriteIORef ref a = do
 
 -- --help
 
--- Text multi-monitor on Xfce4
+-- Test multi-monitor on Xfce4
 
 {-
 reload program
@@ -88,8 +88,8 @@ guiMain file = do
   -- Shared state
   state <- do
     page <- adjustmentNew 0 0 0 1 10 1
-    top <- notebookNew -- TODO: belongs in state
-    presenter <- hPanedNew -- TODO: belongs in state
+    top <- notebookNew
+    presenter <- hPanedNew 
     blankingRef <- newIORef BlankNone
     endTimeRef <- newIORef =<< gGetCurrentTime
     documentURLRef <- newIORef ("file://"++file)
@@ -99,16 +99,6 @@ guiMain file = do
     return $ State { blanking = blankingRef, endTime = endTimeRef, documentURL = documentURLRef
                    , views = viewsRef, document = documentRef, pages = pagesRef
                    , pageAdjustment = page, topNotebook = top, presenterPaned = presenter }
-
-{-
-  Just display <- displayGetDefault
-  nscreens <- displayGetNScreens display
-  putStrLn $ "NScreens:"++show nscreens
-  Just screen <- screenGetDefault
-  nmonitors <- screenGetNMonitors screen
-  putStrLn $ "NMonitors:"++show nmonitors
-  --Rectangle x y width height <- screenGetMonitorGeometry screen 1
--}
 
   -------------------
   -- Audience window
@@ -127,9 +117,8 @@ guiMain file = do
      boxPackStart windowBox (topNotebook state) PackGrow 0
 
      -- Views
--- NOTE: for some odd reason, this crashes if we add the scrolled second
-     do do scrolled <- scrolledWindowNew Nothing Nothing
-           --windowBox `containerAdd` scrolled
+     do -- Thumbnails
+        do scrolled <- scrolledWindowNew Nothing Nothing
            layout <- layoutNew Nothing Nothing
            notebookInsertPage (topNotebook state) scrolled "3" 1
            scrolled `containerAdd` layout
@@ -173,9 +162,8 @@ guiMain file = do
            (pageAdjustment state) `onValueChanged` update
            (pageAdjustment state) `onAdjChanged` update
 
-        do --presenter <- vBoxNew False 0
-           --boxPackStart windowBox presenter PackGrow 0
-           notebookAppendPage (topNotebook state) (presenterPaned state) "1"
+        -- Previews
+        do notebookAppendPage (topNotebook state) (presenterPaned state) "1"
            view1 <- makeView state id False
            view2 <- makeView state (+1) False
            panedPack1 (presenterPaned state) view1 True True
@@ -188,49 +176,50 @@ guiMain file = do
         boxPackEnd windowBox metaBox PackNatural 0
 
         -- Current time
-        time <- labelNew Nothing
-        set time [labelAttributes := [AttrSize 0 (negate 1) 40]]
-        timeoutAdd (readIORef (endTime state) >>= displayTime time >> return True) 100
-        boxPackStart metaBox time PackRepel 0
+        do time <- labelNew Nothing
+           set time [labelAttributes := [AttrSize 0 (negate 1) 40]]
+           timeoutAdd (readIORef (endTime state) >>= displayTime time >> return True) 100
+           boxPackStart metaBox time PackRepel 0
 
         -- Current slide number
-        slideNum <- labelNew Nothing --entryNew
-        set slideNum [labelAttributes := [AttrSize 0 (negate 1) 40]]
-        eventBox <- eventBoxNew
-        eventBox `set` [eventBoxVisibleWindow := False]
-        eventBox `containerAdd` slideNum
-        boxPackStart metaBox eventBox PackNatural 0
-        eventBox `on` buttonReleaseEvent $ lift $ do
-          putStrLn "Open dialog"
-          dialog <- messageDialogNew (Just window) [DialogModal, DialogDestroyWithParent] MessageQuestion ButtonsOkCancel ""
-          box <- dialogGetUpper dialog
-          pageNum <- pageAdjustment state `get` adjustmentValue
-          pageMax <- pageAdjustment state `get` adjustmentUpper
-          entry <- spinButtonNewWithRange 1 pageMax 1
-          entry `set` [entryAlignment := 1, spinButtonValue := pageNum]
-          text <- labelNew (Just $ "Goto slide (1-" ++ show (round pageMax) ++ "):")
-          messageDialogSetImage dialog text
-          entry `on` entryActivate $ dialogResponse dialog ResponseOk
-          boxPackStart box entry PackNatural 0
-          widgetShowAll dialog
-          r <- dialogRun dialog
-          value <- entry `get` spinButtonValue
-          putStrLn $ "V:" ++ show value
-          when (r == ResponseOk) $ (pageAdjustment state) `set` [adjustmentValue := value]
-          putStrLn (show r)
-          widgetDestroy dialog
-          return False
-        
-        let update = do p <- liftM round $ get (pageAdjustment state) adjustmentValue
-                        n <- liftM round $ get (pageAdjustment state) adjustmentUpper
-                        slideNum `set` [labelText := "\t" ++ show p ++ "/" ++ show n]
-          in do (pageAdjustment state) `onValueChanged` update
-                (pageAdjustment state) `onAdjChanged` update
+        do slideNum <- labelNew Nothing
+           set slideNum [labelAttributes := [AttrSize 0 (negate 1) 40]]
+           eventBox <- eventBoxNew
+           eventBox `set` [eventBoxVisibleWindow := False]
+           eventBox `containerAdd` slideNum
+           boxPackStart metaBox eventBox PackNatural 0
+           eventBox `on` buttonPressEvent $ tryEvent $
+             do DoubleClick <- eventClick; liftIO $ gotoSlideDialog state
+           let update = do p <- liftM round $ get (pageAdjustment state) adjustmentValue
+                           n <- liftM round $ get (pageAdjustment state) adjustmentUpper
+                           slideNum `set` [labelText := "\t" ++ show p ++ "/" ++ show n]
+           pageAdjustment state `onValueChanged` update
+           pageAdjustment state `onAdjChanged` update
 
   -- Show windows, fork the rendering thread, and start main loop
   windowListToplevels >>= mapM_ widgetShowAll
   liftIO $ forkIO $ renderThread state
   mainGUI
+
+gotoSlideDialog state = do
+  -- TODO: (Just window) -- Without this it isn't model
+  dialog <- messageDialogNew Nothing [DialogModal, DialogDestroyWithParent] MessageQuestion ButtonsOkCancel ""
+  box <- dialogGetUpper dialog
+  pageNum <- pageAdjustment state `get` adjustmentValue
+  pageMax <- pageAdjustment state `get` adjustmentUpper
+  entry <- spinButtonNewWithRange 1 pageMax 1
+  entry `set` [entryAlignment := 1, spinButtonValue := pageNum]
+  text <- labelNew (Just $ "Goto slide (1-" ++ show (round pageMax) ++ "):")
+  messageDialogSetImage dialog text
+  entry `on` entryActivate $ dialogResponse dialog ResponseOk
+  boxPackStart box entry PackNatural 0
+  widgetShowAll dialog
+  r <- dialogRun dialog
+  value <- entry `get` spinButtonValue
+  when (r == ResponseOk) $ (pageAdjustment state) `set` [adjustmentValue := value]
+  putStrLn (show r)
+  widgetDestroy dialog
+
 
 makeWindow state = do
   window <- windowNew
@@ -271,8 +260,9 @@ makeWindow state = do
         dialog <- fileChooserDialogNew Nothing Nothing FileChooserActionOpen [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
         dialog `on` response $ handleResponce dialog
         widgetShowAll dialog
---fileChooserAddFilter :: FileChooserClass self => self -> FileFilter -> IO ()
         return True
+    handleKey [Graphics.UI.Gtk.Control] "g" = gotoSlideDialog state >> return True
+--fileChooserAddFilter :: FileChooserClass self => self -> FileFilter -> IO ()
     handleKey [] "x" = do doc <- readIORef (document state)
                           case doc of
                             Nothing -> return True
@@ -356,7 +346,9 @@ displayTime label ({-Just-} time) = do
 -- a separate thread, but still call back to the main thread
 -- with postGUISync.
 
---renderThread :: Adjustment -> HPaned -> ThreadingInfo -> IORef State -> IO ()
+-- TODO: factor out into "PDFDocumentRenderer", .getView, .startRendering, .setDocumentURL, etc.
+--       The key being that things that interact with renderThread get encapsulated
+
 renderThread state = sequence_ $ repeat loop where
   loop = do
     threadDelay 1000 -- Keeps the GUI responsive
@@ -386,10 +378,6 @@ renderThread state = sequence_ $ repeat loop where
                         () <- atomicWriteIORef (document state) (Just doc)
                         return (doc, currPage, numPages)
 
-    --postGUISync $ panedStops paned doc
-    --x <- widgetGetSize t
-    --putStrLn $ "FOO:" ++ show x
-
     -- Sizes of the views
     views <- readIORef (views state)
     cache <- liftM (Map.filterWithKey (\k a -> k `elem` Map.elems views)) $ readIORef (pages state)
@@ -397,21 +385,10 @@ renderThread state = sequence_ $ repeat loop where
           page <- sortBy (comparing (\i -> max (i - currPage) (2 * (currPage - i)))) [1..numPages],
           size <- sortBy (flip compare) $ nub $ Map.elems views,
           page `Map.notMember` (Map.findWithDefault Map.empty size cache)] of
-      [] -> threadDelay (100 * 1000) -- Avoid a tight idle loop if all pages rendered
+      [] -> threadDelay (100 * 1000 {-microseconds-}) -- Avoid a tight idle loop if all pages rendered
       ((width, height), pageNum) : _ -> do -- Render a page
         page <- documentGetPage doc (pageNum-1)
         (docWidth, docHeight) <- pageGetSize page
-        --putStrLn "ANNOTS"
-        --annotMappings <- pageGetAnnotMapping page
-        --mapM (\(PopplerAnnotMapping area annot) -> do
-        --        putStrLn $ show area
-        --        putStrLn "BEGIN"
-        --        text <- annotGetContents annot
-        --        putStrLn "MID"
-        --        putStrLn $ show text
-        --        putStrLn "END"
-        --        ) annotMappings
-
         postGUISync $ do
           let scaleFactor = min (fromIntegral width  / docWidth)
                                 (fromIntegral height / docHeight)
@@ -419,20 +396,8 @@ renderThread state = sequence_ $ repeat loop where
                     (round $ scaleFactor * docWidth) (round $ scaleFactor * docHeight) (Just 24)
           renderWithDrawable pixmap $ do
             scale scaleFactor scaleFactor
-            setSourceRGB 1.0 1.0 1.0 >> paint -- page background
+            setSourceRGB 1.0 1.0 1.0 >> paint -- draw page background
             pageRender page -- draw page
-          time' <- gGetCurrentTime
-          --putStrLn $ "SETTING:"++show(width,height,pageNum, formatTime time' (endTime state'))
           -- TODO: filter out unused sizes
           () <- atomicModifyIORef (pages state) (\x -> (Map.unionWith Map.union (Map.singleton (width,height) (Map.singleton pageNum pixmap)) x, ()))
           windowListToplevels >>= mapM_ widgetQueueDraw
-
-
---windowPresent :: WindowClass self => self -> IO ()
---windowSetScreen
---windowScreen :: WindowClass self => Attr self Screen
-  --size <- drawableGetSize (castToDrawable window)
-  --Just screen <- screenGetDefault
-  --Rectangle _ _ width height <- screenGetMonitorGeometry screen 0
---widgetSetSizeRequest area (truncate width) (truncate height)
---windowSetPosition window WinPosCenter

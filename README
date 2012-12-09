@@ -15,16 +15,22 @@ Features (Implemented)
   - Renders slide close to current slide first (at a rate of two forward per one backward)
 
 - Keybindings:
-  - Forward slide: space, page down, enter, right arrow, down arrow
-  - Backward slide: back space, page up, left arrow, up arrow
-  - First slide: home
-  - Last slide: end
-  - Reload file: r
-  - Open file: Ctrl-o
-  - Switch views: tab
-  - Goto slide number: click enty box (direct edit of entry box is buggy)
-  - Change preview: [, ], Shift-[ (minor), Shift-] (minor)
+  - Switching slides:
+    - Forward slide: space, page down, enter, right arrow, down arrow
+    - Backward slide: back space, page up, left arrow, up arrow
+    - First slide: home
+    - Last slide: end
+    - Goto slide number: Ctrl-g, double click enty box (direct edit of entry box is buggy)
+  - Files:
+    - Reload file: r
+    - Open file: Ctrl-o
+  - Views:
+    - Switch views: tab
+    - Change preview: [, ], Shift-[ (minor), Shift-] (minor)
   - Quit: Alt-F4, Ctrl-q
+
+- Command line:
+  - one files as (required) argument
 
 - Since poppler is not thread safe (see https://bugs.freedesktop.org/show_bug.cgi?id=50992),
   all poppler work is done in the render thread or in a postGUISync from the render thread
@@ -35,20 +41,50 @@ Features (TODO)
 
 Blanking
 Hide mouse
+Swap screens
 Click on audience = advance slide
 Click on timer = adjust time (?)
 Timer:
   Pause: pause, p
   Add 1 minute: + (?)
   Reset timer: t
+  Wall clock
+  Time elapsed
+Command line:
+Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l)
 History: Alt-left, Alt-right, XF86Back, XF86Forward
 Auto-Stops on preview
-Record elapsed time (print to stdout?)
+Record slide timing (print to stdout?)
+  Print to stdout as you go
+  Pause recording (R?) - show status in meta-data
 Replay slides (read from stdin or file or cmd line)
 Multiple pdf files:
   store filename and current slide number of non-loaded
   Switch via Ctrl-TAB
   Seperate timers?
+Note mode:
+  only show left half in thumbs and audience and preview next, but show right half in preview current
+  guess on startup based on aspect ratio (>= 2) (fails if vertical pages)
+About dialog
+Scroll: Right/Down vs Left/Up
+Bounded pre-render: Maybe Int (number of slides to pre-render (2/3 will be in front, 1/3 will be behind))
+Fonts should be 36pt or 44pt (48?) (not 40pt):
+  Use AttrScale or <big>(multiple times?)
+Screen saver:
+  xdg-screensaver suspend WindowID
+  xset -dpms (avoid dimming?)
+  xset s off
+'Escape' exits full screen instead of quits
+Default preview to one of the stops: best left, 1/3, 1/2, 2/3, best right
+
+      -d, --duration=N              Duration in minutes of the presentation used for timer display. (Default 45 minutes)
+      -l, --last-minutes=N          Time in minutes, from which on the timer changes its color. (Default 5 minutes)
+      -u, --current-size=N          Percentage of the presenter screen to be used for the current slide. (Default 60)
+      -s, --switch-screens          Switch the presentation and the presenter screen.
+      -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.
+      -z, --disable-compression     Disable the compression of slide images to trade memory consumption for speed. (Avg. factor 30)
+
+-- Look at fullscreen.vala
 
 -- L (last)
 -- Tab (overview)
@@ -66,7 +102,7 @@ Multiple pdf files:
 
 -- disable screen saver
 -- disable screen dimming
--- hyperlinks
+-- hyperlinks (mouse cursor when hover): both Pdf-Presenter and pympress are useful to learn from here
 -- test if works on MS Windows
 -- zoom?
 -- drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
