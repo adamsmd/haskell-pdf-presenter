@@ -41,55 +41,6 @@ stretch vs scale
 page_get_mapping_annotation
 -}
 
-
--- L (last)
--- Tab (overview)
--- Time tracking mode
--- Any key gets out of mute mode?
--- Store shortcuts in F11 keys (or alpha keys? shifted?)
--- escape, Alt+F4, q
--- help, h, ?
--- scroll up/down (zoom presenter(?): duplicate, timer, next slide, minor overview, major overview)
-
--- initial page (for startup)
--- Ctrl-o (open)
--- start counter with "back"
--- pause timer
--- elapsed vs remaining time vs time of day
--- disable screen saver
--- disable screen dimming
--- hyperlinks
--- test if works on MS Windows
--- zoom?
--- drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
--- overview? (TAB?)
--- "Yes" button
--- follow link (ALT-left, ALT-right)
--- overview in the presenter view:
---   - possibly along with current
---   - could have cool zoom out effect
---   - partial zoom out
--- load multiple PDF files?
--- goto slide by number (entry box?, entry box as slide number display? label changes to entry box when clicked)
--- windowed (non-fullscreen)?
--- switch to demo
--- vim or arrow key navigation on overview screen
--- hilight cursor? big cursor? cursor shape?
--- mouse wheel? select slide? select color? zoom?
--- incremental rendering on overview slide (priorizie one's under cursor or ones near current slide)
--- mouse cursor on audience vs presenter screen (click on audience, means next, on presenter means select)
--- set boarder of time on even seconds
--- send-to-back or minimize button
-
--- does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
--- what would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
-
--- page numbers on each tile in tile view
-
--- adjust ending time
--- adjust durration
--- end time = start time + durration (dynamically update?)
-
 data Config = Config {
   {-
   duration
