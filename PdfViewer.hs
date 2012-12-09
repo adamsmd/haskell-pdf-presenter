@@ -194,30 +194,21 @@ guiMain file = do
         boxPackStart metaBox time PackRepel 0
 
         -- Current slide number
-        slideNum <- entryNew
-        slideNum `set` [entryHasFrame := False]
-        pc <- widgetGetPangoContext slideNum
-        fd <- contextGetFontDescription pc
-        fontDescriptionSetSize fd 40
-        widgetModifyFont slideNum (Just fd)
-        widgetModifyBase slideNum StateNormal (Color 0 0 0)
-        entrySetAlignment slideNum 1
-        --entrySetNumeric slideNum True
-        widgetModifyBg slideNum StateNormal (Color 0 0 0)
-        boxPackStart metaBox slideNum PackNatural 0
-        --page `onValueChanged` (get page adjustmentValue >>= entrySetText slideNum . show . round)
-        slideNum `set` [widgetCanFocus := False, entryEditable := False]
-        --slideNum `onEditableChanged` (slideNum `set` [entryText :~ filter (isDigit)])
-{-
-        slideNum `onInsertText` \s p -> if False && all isDigit s
-                                        then editableInsertText slideNum s p >> return (length s + p)
-                                        else return p
--}
-        slideNum `on` buttonReleaseEvent $ lift $ do
+        slideNum <- labelNew Nothing --entryNew
+        set slideNum [labelAttributes := [AttrSize 0 (negate 1) 40]]
+        eventBox <- eventBoxNew
+        eventBox `set` [eventBoxVisibleWindow := False]
+        eventBox `containerAdd` slideNum
+        boxPackStart metaBox eventBox PackNatural 0
+        eventBox `on` buttonReleaseEvent $ lift $ do
+          putStrLn "Open dialog"
           dialog <- messageDialogNew (Just window) [DialogModal, DialogDestroyWithParent] MessageQuestion ButtonsOkCancel ""
           box <- dialogGetUpper dialog
-          entry <- spinButtonNewWithRange 1 95 1 -- TODO: right align
-          text <- labelNew (Just "Goto slide (of 95):") -- TODO: "of"
+          pageNum <- pageAdjustment state `get` adjustmentValue
+          pageMax <- pageAdjustment state `get` adjustmentUpper
+          entry <- spinButtonNewWithRange 1 pageMax 1
+          entry `set` [entryAlignment := 1, spinButtonValue := pageNum]
+          text <- labelNew (Just $ "Goto slide (1-" ++ show (round pageMax) ++ "):")
           messageDialogSetImage dialog text
           entry `on` entryActivate $ dialogResponse dialog ResponseOk
           boxPackStart box entry PackNatural 0
@@ -232,7 +223,7 @@ guiMain file = do
         
         let update = do p <- liftM round $ get (pageAdjustment state) adjustmentValue
                         n <- liftM round $ get (pageAdjustment state) adjustmentUpper
-                        slideNum `set` [entryText := show p ++ "/" ++ show n]
+                        slideNum `set` [labelText := "\t" ++ show p ++ "/" ++ show n]
           in do (pageAdjustment state) `onValueChanged` update
                 (pageAdjustment state) `onAdjChanged` update
 

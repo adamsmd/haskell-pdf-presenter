@@ -4,8 +4,10 @@ Features (Implemented)
 
 - Presenter view
   - Slide counter
-  - Overview
   - Preview
+  - Thumbnails
+    - Current slide hilighted
+    - Click to go to slide
 
 - Rendering
   - Separeate rendering thread
@@ -22,6 +24,7 @@ Features (Implemented)
   - Switch views: tab
   - Goto slide number: click enty box (direct edit of entry box is buggy)
   - Change preview: [, ], Shift-[ (minor), Shift-] (minor)
+  - Quit: Alt-F4, Ctrl-q
 
 - Since poppler is not thread safe (see https://bugs.freedesktop.org/show_bug.cgi?id=50992),
   all poppler work is done in the render thread or in a postGUISync from the render thread
@@ -30,22 +33,37 @@ Features (Implemented)
 Features (TODO)
 ==================
 
-Click to go to slide
-Stops
+Blanking
+Hide mouse
+Click on audience = advance slide
+Click on timer = adjust time (?)
+Timer:
+  Pause: pause, p
+  Add 1 minute: + (?)
+  Reset timer: t
+History: Alt-left, Alt-right, XF86Back, XF86Forward
+Auto-Stops on preview
+Record elapsed time (print to stdout?)
+Replay slides (read from stdin or file or cmd line)
+Multiple pdf files:
+  store filename and current slide number of non-loaded
+  Switch via Ctrl-TAB
+  Seperate timers?
 
 -- L (last)
 -- Tab (overview)
 -- Time tracking mode
 -- Any key gets out of mute mode?
 -- Store shortcuts in F11 keys (or alpha keys? shifted?)
--- escape, Alt+F4, q
 -- help, h, ?
 -- scroll up/down (zoom presenter(?): duplicate, timer, next slide, minor overview, major overview)
 
+-- Timer:
 -- initial page (for startup)
 -- start counter with "back"
 -- pause timer
 -- elapsed vs remaining time vs time of day
+
 -- disable screen saver
 -- disable screen dimming
 -- hyperlinks
@@ -58,13 +76,11 @@ Stops
 --   - possibly along with current
 --   - could have cool zoom out effect
 --   - partial zoom out
--- load multiple PDF files?
 -- windowed (non-fullscreen)?
 -- switch to demo
 -- vim or arrow key navigation on overview screen
 -- hilight cursor? big cursor? cursor shape?
 -- mouse wheel? select slide? select color? zoom?
--- incremental rendering on overview slide (priorizie one's under cursor or ones near current slide)
 -- mouse cursor on audience vs presenter screen (click on audience, means next, on presenter means select)
 -- set boarder of time on even seconds
 -- send-to-back or minimize button
