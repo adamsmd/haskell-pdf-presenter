@@ -3,11 +3,21 @@ Features (Implemented)
 ======================
 
 - Presenter view
-  - Slide counter
+  - Metadata:
+    - Fonts are big (60pt = 5 * 12pt)
+    - Timer:
+      - Colors: white, red (warning), purple (overtime)
+          Yeah, these colors are a bit strange, but I've chosen them to
+          be easily distinguishale even in paripheral vision or at a
+          glance.  I don't know how well they work for color-blind
+          people.  Feedback is welcome.
+    - Slide counter
+      - Double click to go to slide
   - Preview
   - Thumbnails
     - Current slide hilighted
     - Click to go to slide
+    - Mouse wheel scrolls instead of changes slide
 
 - Rendering
   - Separeate rendering thread
@@ -21,12 +31,14 @@ Features (Implemented)
     - First slide: home
     - Last slide: end
     - Goto slide number: Ctrl-g, double click enty box (direct edit of entry box is buggy)
+  - Timer control:
+    - Toggle pause: p, pause
   - Files:
     - Reload file: r
     - Open file: Ctrl-o
-  - Views:
+  - Presenter screen:
     - Switch views: tab
-    - Change preview: [, ], Shift-[ (minor), Shift-] (minor)
+    - Change preview percentage: [, ], Shift-[ (minor), Shift-] (minor)
   - Quit: Alt-F4, Ctrl-q
 
 - Command line:
@@ -39,25 +51,31 @@ Features (Implemented)
 Features (TODO)
 ==================
 
-Blanking
-Hide mouse
+If single screen, then put audience on top
++Blanking
++Hide mouse
++Soft pause
 Swap screens
 Click on audience = advance slide
 Click on timer = adjust time (?)
 Timer:
-  Pause: pause, p
+  +command line option
   Add 1 minute: + (?)
-  Reset timer: t
+  +Reset timer: t
   Wall clock
   Time elapsed
 Command line:
-Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l)
++Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l): use instead of refresh screen
 History: Alt-left, Alt-right, XF86Back, XF86Forward
-Auto-Stops on preview
+Auto-Stops on preview panes:
+  +, -, =
 Record slide timing (print to stdout?)
   Print to stdout as you go
   Pause recording (R?) - show status in meta-data
-Replay slides (read from stdin or file or cmd line)
+  Print timer status changes
+  Print presenter dispaly changes
+Replay slides (read from stdin or file or cmd line):
+  Start/stop replay
 Multiple pdf files:
   store filename and current slide number of non-loaded
   Switch via Ctrl-TAB
@@ -68,9 +86,7 @@ Note mode:
 About dialog
 Scroll: Right/Down vs Left/Up
 Bounded pre-render: Maybe Int (number of slides to pre-render (2/3 will be in front, 1/3 will be behind))
-Fonts should be 36pt or 44pt (48?) (not 40pt):
-  Use AttrScale or <big>(multiple times?)
-Screen saver:
++Screen saver:
   xdg-screensaver suspend WindowID
   xset -dpms (avoid dimming?)
   xset s off
@@ -86,8 +102,6 @@ Default preview to one of the stops: best left, 1/3, 1/2, 2/3, best right
 
 -- Look at fullscreen.vala
 
--- L (last)
--- Tab (overview)
 -- Time tracking mode
 -- Any key gets out of mute mode?
 -- Store shortcuts in F11 keys (or alpha keys? shifted?)
@@ -100,14 +114,11 @@ Default preview to one of the stops: best left, 1/3, 1/2, 2/3, best right
 -- pause timer
 -- elapsed vs remaining time vs time of day
 
--- disable screen saver
--- disable screen dimming
 -- hyperlinks (mouse cursor when hover): both Pdf-Presenter and pympress are useful to learn from here
 -- test if works on MS Windows
 -- zoom?
 -- drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
 -- "Yes" button
--- follow link (ALT-left, ALT-right)
 -- overview in the presenter view:
 --   - possibly along with current
 --   - could have cool zoom out effect
@@ -119,7 +130,7 @@ Default preview to one of the stops: best left, 1/3, 1/2, 2/3, best right
 -- mouse wheel? select slide? select color? zoom?
 -- mouse cursor on audience vs presenter screen (click on audience, means next, on presenter means select)
 -- set boarder of time on even seconds
--- send-to-back or minimize button
+-- send-to-back or minimize button: ctrl-z?
 
 -- does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
 -- what would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?

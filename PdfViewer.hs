@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 module Main where
 
 --import Control.Applicative
@@ -30,6 +31,10 @@ atomicWriteIORef ref a = do
     x <- atomicModifyIORef ref (\_ -> (a, ()))
     x `seq` return ()
 
+-- Would be useful to have in GHC
+modifyIORef' ref f = do
+  writeIORef ref =<< f =<< readIORef ref
+
 
 -- --help
 
@@ -51,13 +56,14 @@ data Config = Config {
   -}
 }
 
-data TimerState = Counting GTimeVal | Paused Int{-seconds-}
+data TimerState = Counting Integer{-end time-} | Paused Integer{-seconds-}
 
 data Blanking = BlankNone | BlankBlack | BlankWhite
 data State = State
- { endTime :: IORef GTimeVal -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
+ { timer :: IORef TimerState -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
  , blanking :: IORef Blanking
  , documentURL :: IORef String -- TODO: Maybe
+ , warningTime :: IORef Integer{-microseconds-}
  -- split ratio
  -- switch screens
  , views :: IORef (Map.Map Widget (Int{-width-}, Int{-height-}))
@@ -86,19 +92,17 @@ main = do
 guiMain :: FilePath -> IO ()
 guiMain file = do
   -- Shared state
-  state <- do
-    page <- adjustmentNew 0 0 0 1 10 1
-    top <- notebookNew
-    presenter <- hPanedNew 
-    blankingRef <- newIORef BlankNone
-    endTimeRef <- newIORef =<< gGetCurrentTime
-    documentURLRef <- newIORef ("file://"++file)
-    viewsRef <- newIORef Map.empty
-    documentRef <- newIORef Nothing
-    pagesRef <- newIORef Map.empty
-    return $ State { blanking = blankingRef, endTime = endTimeRef, documentURL = documentURLRef
-                   , views = viewsRef, document = documentRef, pages = pagesRef
-                   , pageAdjustment = page, topNotebook = top, presenterPaned = presenter }
+  state <- return State
+    `ap` newIORef (Paused (6 * 1000 * 1000))
+    `ap` newIORef BlankNone
+    `ap` newIORef ("file://"++file)
+    `ap` newIORef (3 * 1000 * 1000)
+    `ap` newIORef Map.empty {-views-}
+    `ap` newIORef Nothing {-document-}
+    `ap` newIORef Map.empty {-pages-}
+    `ap` adjustmentNew 0 0 0 1 10 1 {-pageAdjustment-}
+    `ap` notebookNew {-topNotebook-}
+    `ap` hPanedNew {-presenterPaned-}
 
   -------------------
   -- Audience window
@@ -177,13 +181,13 @@ guiMain file = do
 
         -- Current time
         do time <- labelNew Nothing
-           set time [labelAttributes := [AttrSize 0 (negate 1) 40]]
-           timeoutAdd (readIORef (endTime state) >>= displayTime time >> return True) 100
+           timeoutAdd (readIORef (timer state) >>= displayTime time state >> return True) 100
            boxPackStart metaBox time PackRepel 0
 
         -- Current slide number
         do slideNum <- labelNew Nothing
-           set slideNum [labelAttributes := [AttrSize 0 (negate 1) 40]]
+           set slideNum [labelAttributes := [AttrSize 0 (negate 1) 60,
+                                             AttrForeground 0 (negate 1) (Color 0xffff 0xffff 0xffff)]]
            eventBox <- eventBoxNew
            eventBox `set` [eventBoxVisibleWindow := False]
            eventBox `containerAdd` slideNum
@@ -220,7 +224,6 @@ gotoSlideDialog state = do
   putStrLn (show r)
   widgetDestroy dialog
 
-
 makeWindow state = do
   window <- windowNew
   windowFullscreen window
@@ -231,7 +234,7 @@ makeWindow state = do
   window `on` keyPressEvent $ do
      mods <- eventModifier
      name <- eventKeyName
-     liftIO $ handleKey mods name
+     liftIO $ handleKey mods (map toLower name)
   return window where
     -- TODO: left and right mouse click for forward and backward
     handleResponce dialog ResponseOk = do
@@ -248,12 +251,14 @@ makeWindow state = do
       pageAdjustment state `set` [adjustmentValue :~ (+(negate 1))] >> return True
     handleKey [] key | key `elem` ["Right", "Down", "Page_Down", "Right", "space", "Return"] =
       pageAdjustment state `set` [adjustmentValue :~ (+1)] >> return True
-    handleKey [] "Home" = pageAdjustment state `set` [adjustmentValue := 0] >> return True
-    handleKey [] "End" = pageAdjustment state `get` adjustmentUpper >>= \p -> pageAdjustment state `set` [adjustmentValue := p] >> return True
-    handleKey [] "Tab" = topNotebook state `set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)] >> return True
+    handleKey [] "home" = pageAdjustment state `set` [adjustmentValue := 0] >> return True
+    handleKey [] "end" = pageAdjustment state `get` adjustmentUpper >>= \p -> pageAdjustment state `set` [adjustmentValue := p] >> return True
+    handleKey [] "tab" = topNotebook state `set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)] >> return True
     handleKey [] "r" = atomicWriteIORef (document state) Nothing >>= \() -> return True
     handleKey [] "bracketleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 20))] >> return True
     handleKey [] "bracketright" = presenterPaned state `set` [panedPosition :~ (+20)] >> return True
+    handleKey [] "p" = modifyIORef' (timer state) toggleTimer >> return True
+    handleKey [] "pause" = modifyIORef' (timer state) toggleTimer >> return True
     handleKey [Shift] "braceleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 1))] >> return True
     handleKey [Shift] "braceright" = presenterPaned state `set` [panedPosition :~ (+1)] >> return True
     handleKey [Graphics.UI.Gtk.Control] "o" = do
@@ -298,7 +303,7 @@ makeView state offset border = do
             case doc of
               Nothing -> "Loading file..." -- TODO: filename
               Just _  -> "Rendering slide "++show p++" of "++show n++"..."
-          liftIO $ layoutSetAttributes layout [AttrForeground 0 (negate 1) (Color 65535 65535 65535),
+          liftIO $ layoutSetAttributes layout [AttrForeground 0 (negate 1) (Color 0xffff 0xffff 0xffff),
                                                AttrWeight 0 (negate 1) WeightBold,
                                                AttrSize 0 (negate 1) 24]
           liftIO $ drawLayout drawWindow gc 0 0 {-x y-} layout
@@ -317,28 +322,46 @@ makeView state offset border = do
     return ()
   return area
 
-formatTime :: GTimeVal -> GTimeVal -> String
-formatTime (GTimeVal { gTimeValSec = sec1, gTimeValUSec = usec1 })
-           (GTimeVal { gTimeValSec = sec2, gTimeValUSec = usec2 }) =
-  (if time1 - time2 < 0 then "-" else "") ++
-  pad hours ++ ":" ++ pad minutes ++ ":" ++ pad seconds ++ "." ++ show tenths where
-    time1 = sec1 * 1000 * 1000 + usec1
-    time2 = sec2 * 1000 * 1000 + usec2
-    ((((hours, minutes), seconds), tenths), _) = id // 60 // 60 // 10 // (100*1000) $ abs (time1 - time2)
+------------------------
+-- Timer Handling
+------------------------
+
+startTimer t@(Counting _) = return $ t
+startTimer t@(Paused _) = toggleTimer t
+
+toggleTimer (Counting microseconds) = liftM (Paused . (microseconds-)) getMicroseconds
+toggleTimer (Paused microseconds) = liftM (Counting . (microseconds+)) getMicroseconds
+
+getMicroseconds :: IO Integer
+getMicroseconds = do
+  GTimeVal { gTimeValSec = sec, gTimeValUSec = usec } <- gGetCurrentTime
+  return (fromIntegral sec * 1000 * 1000 + fromIntegral usec)
+
+displayTime label state (Paused microseconds) = displayTime' label state True microseconds
+displayTime label state (Counting microseconds) = getMicroseconds >>= displayTime' label state False . (microseconds-)
+displayTime' :: Label -> State -> Bool -> Integer -> IO ()
+displayTime' label state paused microseconds = do
+  warning <- readIORef (warningTime state)
+  let color | microseconds < 0 = Color 0x8888 0x3333 0xffff {-purple-}
+            | microseconds < warning = Color 0xffff 0x0000 0x0000 {-red-}
+            | otherwise = Color 0xffff 0xffff 0xffff
+  set label [labelText := formatTime microseconds ++ (if paused then " (paused)" else ""),
+             labelAttributes := [AttrSize 0 (negate 1) 60, AttrForeground 0 (negate 1) color]]
+
+formatTime :: Integer -> String
+formatTime microseconds =
+  (if microseconds < 0 then "-" else "") ++
+  pad hours ++ ":" ++ pad minutes ++ ":" ++ pad seconds {-++ "." ++ show tenths-} where
+    ((((hours, minutes), seconds), tenths), _) = id // 60 // 60 // 10 // (100*1000) $ abs microseconds
     (//) f base val = (f q, r) where (q, r) = val `quotRem` base
     pad x = case show x of
       [c]     -> ['0', c]
       ['-',c] -> ['-', '0', c]
       cs       -> cs
 
---displayTime label {-Nothing-} = set label [labelText := "00:00:00"]
-displayTime label ({-Just-} time) = do
-  time' <- gGetCurrentTime
-  --when gTimeValAdd time (5*60) > time' $ orange
-  --when time > time' $ red -- flashing?
-  set label [labelText := formatTime time time'
-             --labelAttributes := [pangoattrib]
-            ]
+------------------------
+-- Render thread
+------------------------
 
 -- GTK on windows requires that all GUI operations be done in the GUI thread.
 -- We could use an "idle" function for this, but if we don't cancel the
