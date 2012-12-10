@@ -54,6 +54,11 @@ Features (Implemented)
 Features (TODO)
 ==================
 
+-- [hour, minute, second] = map read, split on ":" (pad to front)
+Menubar shadow:
+  https://bugs.launchpad.net/ubuntu/+source/unity/+bug/967193
+  Focus audience window
+
 Sync with Audio recording (audio mark?)
 If single screen, then put audience on top
 +Mute status in meta-data
@@ -66,11 +71,11 @@ Timer:
   Dialog: warning time, total time, time remaining (use grid (labels on left, entries on right); same for slide selection)
   +command line option
   Add 1 minute: + (?)
-  +Reset timer: t
+  ++Reset timer: t
   Wall clock
   Time elapsed
 Command line:
-+Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l):
+++Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l):
   use instead of refresh screen
   full screen all (some?)
 History: Alt-left, Alt-right, XF86Back, XF86Forward
@@ -100,8 +105,6 @@ Bounded pre-render: Maybe Int (number of slides to pre-render (2/3 will be in fr
 'Escape' exits full screen instead of quits
 Default preview to one of the stops: best left, 1/3, 1/2, 2/3, best right
 
-      -d, --duration=N              Duration in minutes of the presentation used for timer display. (Default 45 minutes)
-      -l, --last-minutes=N          Time in minutes, from which on the timer changes its color. (Default 5 minutes)
       -u, --current-size=N          Percentage of the presenter screen to be used for the current slide. (Default 60)
       -s, --switch-screens          Switch the presentation and the presenter screen.
       -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.

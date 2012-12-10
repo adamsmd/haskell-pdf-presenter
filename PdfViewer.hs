@@ -1,28 +1,27 @@
 {-# LANGUAGE TupleSections #-}
 module Main where
 
---import Control.Applicative
---import Control.Concurrent.STM
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Trans
+import Data.Char (toLower)
+import Data.IORef
+import Data.List (sortBy, nub)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, fromJust)
-import Data.IORef
-import Data.List
-import Data.Ord
+import Data.Ord (comparing)
 import Graphics.Rendering.Cairo
 import Graphics.Rendering.Cairo.Types
 --import Graphics.Rendering.Pango
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.Gdk.GC (GC, gcNew, gcGetValues, gcSetValues, foreground, lineWidth)
+import Graphics.UI.Gtk.Builder
+import Graphics.UI.Gtk.Gdk.GC
 import Graphics.UI.Gtk.Poppler.Document
 import Graphics.UI.Gtk.Poppler.Page
 --import Graphics.UI.Gtk.Poppler.Annot
---import Graphics.UI.Gtk.Windows.Window
 import System.Console.GetOpt
+import System.Exit
 import System.Glib
-import Data.Char
 --import System.Process
 
 -- IF OLD GHC
@@ -35,250 +34,339 @@ atomicWriteIORef ref a = do
 modifyIORef' ref f = do
   writeIORef ref =<< f =<< readIORef ref
 
-
--- --help
-
 -- Test multi-monitor on Xfce4
 
-{-
-reload program
-stretch vs scale
-page_get_mapping_annotation
--}
-
-data Config = Config {
-  {-
-  duration
-  last-minutes
-  caching
-  compression
-  flash
-  -}
-}
-
-data TimerState = Counting Integer{-end time-} | Paused Integer{-seconds-}
-
+data TimerState = Counting Integer{-ending microseconds-} | Paused Integer{-remaining microseconds-} | Stopped Integer{-remaining microseconds-}
 data VideoMuteState = MuteOff | MuteBlack | MuteWhite deriving (Eq)
+
 data State = State
- { timer :: IORef TimerState -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
- , videoMute :: IORef VideoMuteState
+ {
+-- Settable on command line
+   duration :: IORef Integer{-microseconds-}
+ , warning :: IORef Integer{-microseconds-}
  , documentURL :: IORef String -- TODO: Maybe
- , warningTime :: IORef Integer{-microseconds-}
- -- split ratio
- -- switch screens
+
+-- Dynamic State
+ , timer :: IORef TimerState -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
+ , videoMute :: IORef VideoMuteState
+ , fullscreen :: IORef Bool -- TODO: partial full screen? full screen on other?
+
+-- UI State
+ , builder :: Builder
+
+-- Render State
  , views :: IORef (Map.Map Widget (Int{-width-}, Int{-height-}))
  , document :: IORef (Maybe Document)
  , pages :: IORef (Map.Map (Int{-width-}, Int{-height-}) (Map.Map Int{-page number-} Pixmap{-cached page-}))
  , pageAdjustment :: Adjustment {- immutable -}
- , topNotebook :: Notebook
- , presenterPaned :: HPaned
 }
 
-data GuiState = GuiState {}
+setOption opt val = NoArg $ \state -> writeIORef (opt state) val
+boolOption opt = OptArg (\val state -> writeIORef (opt state) (read $ fromMaybe "True" val)) -- TODO: yes/no
+argOption opt f = ReqArg (\val state -> writeIORef (opt state) (f val))
 
-options = []
+header = "Usage: PdfViewer [OPTION...] file"
+options = [
+--  Option "f" ["fullscreen"] (setOption fullScreen True) "Enable full screen"
+--, Option "f" ["no-fullscreen"] (setOption fullScreen False) "Enable full screen"
+   Option "" ["duration"] (argOption duration (round . (*(60*1000*1000)) . read) "MINUTES") "Timer duration (default 20)" -- TODO: Minute second notation
+ , Option "w" ["warning"] (argOption warning (round . (*(60*1000*1000)) . read) "MINUTES") "Warning duration in minutes (default 5)"
+ , Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
+-- TODO: nice message on malformed durration
+ , Option "f" ["fullscreen"] (boolOption fullscreen "True/False") "Full screen on startup (default off)"
+ , Option "" ["mute-black"] (setOption videoMute MuteBlack) "Start with mute to black"
+ , Option "" ["mute-white"] (setOption videoMute MuteBlack) "Start with mute to white"
+ , Option "" ["mute-off"] (setOption videoMute MuteBlack) "Start with no muting (default)"
+-- swap screens
+-- show clock
+-- show elapsed time
+-- show remaining time
+-- start record
+-- note mode
+-- +prerender size (zero means no bound)
+-- version
+-- preview percentage
+-- +columns in preview
+ , Option "" ["initial-slide"] (ReqArg (\val state -> pageAdjustment state `set` [adjustmentUpper := read val, adjustmentValue := read val]) "INT") "Initial slide (default 1)"
+-- stretch vs scale
+ ]
+-- TODO: on full screen, pull windows to front
 
-defaultConfig = Config {}
+-- TODO: when repaint window, need to repaint all windows (store list of windows in State)
 
 main :: IO ()
 main = do
   -- Get program arguments.
   args <- initGUI
-  case getOpt Permute options args of
-    (o, [file], []) -> return (foldl (flip ($)) defaultConfig o) >> guiMain file
-    (_, _, errors) -> ioError (userError (concat errors ++ usageInfo header options))
-  where header = "Usage: PdfViewer [OPTION...] file"
-
-guiMain :: FilePath -> IO ()
-guiMain file = do
   -- Shared state
   state <- return State
-    `ap` newIORef (Paused (6 * 1000 * 1000))
+    `ap` newIORef (20 * 60 * 1000 * 1000) {-duration-}
+    `ap` newIORef (5 * 60 * 1000 * 1000) {-warning-}
+    `ap` newIORef (error "internal error: undefined document url")
+
+    `ap` newIORef (error "internal error: undefined timer state")
     `ap` newIORef MuteOff
-    `ap` newIORef ("file://"++file)
-    `ap` newIORef (3 * 1000 * 1000)
+    `ap` newIORef False
+
+    `ap` builderNew
+
     `ap` newIORef Map.empty {-views-}
     `ap` newIORef Nothing {-document-}
     `ap` newIORef Map.empty {-pages-}
     `ap` adjustmentNew 0 0 0 1 10 1 {-pageAdjustment-}
-    `ap` notebookNew {-topNotebook-}
-    `ap` hPanedNew {-presenterPaned-}
+  case getOpt Permute options args of
+    (opts, [file], []) -> mapM_ ($ state) opts >> guiMain state file
+    (_, _, errors) -> putStr (unlines errors) >> putStr (usageInfo header options)
 
-  -------------------
-  -- Audience window
-  -------------------
-  do window <- makeWindow state
-     view <- makeView state id (postDrawVideoMute state)
-     window `containerAdd` view
+-- ioError (userError "Message")
 
-  -------------------
-  -- Presenter window
-  -------------------
-  do window <- makeWindow state
-     windowBox <- vBoxNew False 0
-     window `containerAdd` windowBox
-     topNotebook state `set` [notebookShowBorder := False, notebookShowTabs := False]
-     boxPackStart windowBox (topNotebook state) PackGrow 0
-
-     -- Views
-     do -- Thumbnails
-        do scrolled <- scrolledWindowNew Nothing Nothing
-           layout <- layoutNew Nothing Nothing
-           notebookInsertPage (topNotebook state) scrolled "3" 1
-           scrolled `containerAdd` layout
-           oldWidth <- newIORef 0
-           heightRef <- newIORef 0
-           let columns = 4
-
-           -- Recompute when the view size changes
-           let recomputeViews (Graphics.UI.Gtk.Rectangle _ _ newWidth _) = do
-                 oldWidth' <- readIORef oldWidth
-                 when (oldWidth' /= newWidth) $ do -- Keep from looping forever
-                   containerForeach layout (containerRemove layout)
-                   numPages <- pageAdjustment state `get` adjustmentUpper
-                   let width = newWidth `div` columns
-                       height = width * 3 `div` columns
-                       numRows = round numPages `div` columns + 1
-                   putStrLn $ "RECOMPUTING THUMBS" ++ show (numPages, newWidth, width, height, numRows)
-                   layoutSetSize layout newWidth (height*numRows)
-                   () <- sequence_ [ do
-                     let page = columns*row+col+1
-                     view <- makeView state (const page) (postDrawBorder page state)
-                     widgetSetSizeRequest view width height
-                     layoutPut layout view (col*width) (row*height)
-                     view `widgetAddEvents` [ButtonPressMask, ButtonReleaseMask]
-                     view `on` buttonReleaseEvent $ tryEvent $
-                          liftIO $ pageAdjustment state `set` [adjustmentValue := fromIntegral page]
-                     | row <- [0..numRows-1], col <- [0..3]]
-                   writeIORef heightRef height
-                   widgetShowAll layout
-                   writeIORef oldWidth newWidth
-                   return ()
-           layout `onSizeAllocate` recomputeViews
-           --onZoom $ recocmputeViews
-
-           -- Scroll to keep the current slide visible
-           adjustment <- scrolledWindowGetVAdjustment scrolled
-           let update = do p <- liftM round $ get (pageAdjustment state) adjustmentValue
-                           let row = (p-1) `div` columns
-                           height <- readIORef heightRef
-                           adjustmentClampPage adjustment (fromIntegral $ row*height) (fromIntegral $ row*height+height)
-           (pageAdjustment state) `onValueChanged` update
-           (pageAdjustment state) `onAdjChanged` update
-
-        -- Previews
-        do notebookAppendPage (topNotebook state) (presenterPaned state) "1"
-           view1 <- makeView state id postDrawNone
-           view2 <- makeView state (+1) postDrawNone
-           panedPack1 (presenterPaned state) view1 True True
-           panedPack2 (presenterPaned state) view2 True True
-
-        return ()
-
-     -- Meta-data
-     do metaBox <- hBoxNew False 0
-        boxPackEnd windowBox metaBox PackNatural 0
-
-        -- Current time
-        do time <- labelNew Nothing
-           timeoutAdd (readIORef (timer state) >>= displayTime time state >> return True) 100
-           boxPackStart metaBox time PackRepel 0
-
-        -- Current slide number
-        do slideNum <- labelNew Nothing
-           set slideNum [labelAttributes := [AttrSize 0 (negate 1) 60,
-                                             AttrForeground 0 (negate 1) (Color 0xffff 0xffff 0xffff)]]
-           eventBox <- eventBoxNew
-           eventBox `set` [eventBoxVisibleWindow := False]
-           eventBox `containerAdd` slideNum
-           boxPackStart metaBox eventBox PackNatural 0
-           eventBox `on` buttonPressEvent $ tryEvent $
-             do DoubleClick <- eventClick; liftIO $ gotoSlideDialog state
-           let update = do p <- liftM round $ get (pageAdjustment state) adjustmentValue
-                           n <- liftM round $ get (pageAdjustment state) adjustmentUpper
-                           slideNum `set` [labelText := "\t" ++ show p ++ "/" ++ show n]
-           pageAdjustment state `onValueChanged` update
-           pageAdjustment state `onAdjChanged` update
-
-  -- Show windows, fork the rendering thread, and start main loop
-  windowListToplevels >>= mapM_ widgetShowAll
-  liftIO $ forkIO $ renderThread state
-  mainGUI
-
-gotoSlideDialog state = do
-  -- TODO: (Just window) -- Without this it isn't model
+{-
+timerDialog state = do
+  dialg <- builder
+  remainingTime <- builder
+  totalTime <- builder
+  warningTime <- builder
+  stoppedButton `set` [toggleButtonActive := True]
+  pause timer
+  fill remaining time
+  fill total time
+  fill warning time
+  show
+  wait
+  ...
+-}
+{-
+timerDialog state = do
   dialog <- messageDialogNew Nothing [DialogModal, DialogDestroyWithParent] MessageQuestion ButtonsOkCancel ""
   box <- dialogGetUpper dialog
-  pageNum <- pageAdjustment state `get` adjustmentValue
-  pageMax <- pageAdjustment state `get` adjustmentUpper
-  entry <- spinButtonNewWithRange 1 pageMax 1
-  entry `set` [entryAlignment := 1, spinButtonValue := pageNum]
-  text <- labelNew (Just $ "Goto slide (1-" ++ show (round pageMax) ++ "):")
+  grid <- ...
+  pause timer
+  table <- tableNew 6 2 False
+  remainingEntry <- entryNew
+  durationEntry <- entryNew
+  warningEntry <- entryNew
+  stoppedRadio <- radioButtonNewWithLabel "Stopped"
+  pausedRadio <- radioButtonNewWithLabelFromWidget r1 "Paused"
+  runningRadio <- radioButtonNewWithLabelFromWidget r1 "Running"
+  labelNew (Just "Remaining time:") >>= \l -> tableAttachDefaults table l 0 0 0 0
+  labelNew (Just "Total time:") >>= \l -> tableAttachDefaults table l 1 1 0 0
+  labelNew (Just "Warning time:") >>= \l -> tableAttacheDefaults table l 2 2 0 0
+  labelNew (Just "Timer status:") >>= \l -> tableAttachDefaults table l 3 3 0 0
+  tableAttachDefaults table remainingEntry 0 0 1 1
+  tableAttachDefaults table durationEntry 1 1 1 1
+  tableAttachDefaults table warningEntry 2 2 1 1
+  tableAttachDefaults table stoppedRadio 3 3 1 1
+  tableAttachDefaults table pausedRadio 4 4 1 1
+  tableAttachDefaults table runningRadio 5 5 1 1
+  widgetGrabFocus remainingEntry
+
+  entry `set` [entryAlignment := 1]
   messageDialogSetImage dialog text
   entry `on` entryActivate $ dialogResponse dialog ResponseOk
-  boxPackStart box entry PackNatural 0
   widgetShowAll dialog
   r <- dialogRun dialog
   value <- entry `get` spinButtonValue
-  when (r == ResponseOk) $ (pageAdjustment state) `set` [adjustmentValue := value]
+  when (r == ResponseOk) $ pageAdjustment state `set` [adjustmentValue := value]
   putStrLn (show r)
   widgetDestroy dialog
 
-makeWindow state = do
-  window <- windowNew
-  windowFullscreen window
-  widgetModifyBg window StateNormal (Color 0 0 0)
-  window `onDestroy` mainQuit
-  pageAdjustment state `onValueChanged` widgetQueueDraw window
-  pageAdjustment state `onAdjChanged` widgetQueueDraw window -- ensures page counter is updated
-  window `on` keyPressEvent $ do
-     mods <- eventModifier
-     name <- eventKeyName
-     liftIO $ widgetQueueDraw window
-     liftIO $ handleKey mods (map toLower name)
-  return window where
-    -- TODO: left and right mouse click for forward and backward
-    handleResponce dialog ResponseOk = do
+
+time remaining
+duration time
+warning time
+timer status: stopped, paused, running
+-}
+
+mainWindows state =
+  mapM (builderGetObject (builder state) castToWindow) ["audienceWindow", "presenterWindow"]
+
+guiMain :: State -> FilePath -> IO ()
+guiMain state file = do
+  -- Finish setting up the state
+  writeIORef (documentURL state) ("file://"++file)
+  writeIORef (timer state) =<< liftM Paused (readIORef (duration state))
+
+  -- Load and setup the GUI
+  builderAddFromFile (builder state) "presenter.glade"
+
+  -- Connect the widgets to their events
+  -- * Audience Window
+  do window <- builderGetObject (builder state) castToWindow "audienceWindow"
+     --configWindow state window
+     view <- makeView state id (postDrawVideoMute state)
+     window `containerAdd` view
+     --widgetShowAll window
+
+  -- * Presenter window
+  -- ** Views
+  -- *** Previews
+  do paned <- builderGetObject (builder state) castToPaned "previewPaned"
+     view1 <- makeView state id postDrawNone
+     view2 <- makeView state (+1) postDrawNone
+     panedPack1 paned view1 True True
+     panedPack2 paned view2 True True
+
+  -- *** Thumbnails
+  do oldWidth <- newIORef 0
+     layout <- builderGetObject (builder state) castToLayout "thumbnailsLayout"
+     -- TODO: why are thumbnail renderings delayed?
+     layout `onSizeAllocate` recomputeViews oldWidth state
+     --recomputeViews oldWidth state
+     --onZoom $ recocmputeViews
+
+     -- Scroll to keep the current slide visible
+     -- TODO: something is wrong with the adjustment
+     scrolled <- builderGetObject (builder state) castToScrolledWindow "thumbnailsScrolledWindow"
+     adjustment <- scrolledWindowGetVAdjustment scrolled
+     let update = do p <- liftM round $ pageAdjustment state `get` adjustmentValue
+                     let row = (p-1) `div` columns
+                     height <- liftM (heightFromWidth . (`div` columns)) $ readIORef oldWidth
+                     adjustmentClampPage adjustment (fromIntegral $ row*height) (fromIntegral $ row*height+height)
+     pageAdjustment state `onValueChanged` update
+     pageAdjustment state `onAdjChanged` update
+
+  -- ** Meta-data
+  -- *** Current time
+  do time <- builderGetObject (builder state) castToLabel "timeLabel"
+     timeoutAdd (readIORef (timer state) >>= displayTime time state >> return True) 100
+
+  -- *** Current slide number
+  do slideNum <- builderGetObject (builder state) castToLabel "slideLabel"
+     eventBox <- builderGetObject (builder state) castToEventBox "slideEventBox"
+     eventBox `on` buttonPressEvent $ tryEvent $
+       do DoubleClick <- eventClick; liftIO $ gotoSlideDialog state
+     let update = do p <- liftM round $ pageAdjustment state `get` adjustmentValue
+                     n <- liftM round $ pageAdjustment state `get` adjustmentUpper
+                     slideNum `set` [labelText := show p ++ "/" ++ show n]
+     pageAdjustment state `onValueChanged` update
+     pageAdjustment state `onAdjChanged` update
+
+  -- Setup the top-level windows
+  do let setupWindow window = do
+           --windowFullscreen window
+           widgetModifyBg window StateNormal (Color 0 0 0)
+           window `onDestroy` mainQuit
+           window `on` keyPressEvent $ do
+              mods <- eventModifier
+              name <- eventKeyName
+              b <- liftIO $ handleKey state mods (map toLower name)
+              liftIO $ mapM_ widgetQueueDraw =<< mainWindows state
+              return b
+           -- | Overkill but most of the window has to be redrawn anyway
+           pageAdjustment state `onValueChanged` widgetQueueDraw window
+           pageAdjustment state `onAdjChanged` widgetQueueDraw window
+           widgetShowAll window
+     mapM_ setupWindow =<< mainWindows state
+
+  -- Fork the rendering thread, and start main loop
+  liftIO $ forkIO $ renderThread state
+  mainGUI
+
+-- TODO: remove
+heightFromWidth w = w * 3 `div` 4
+columns = 4
+
+-- Recompute when the view size changes
+recomputeViews oldWidth state (Graphics.UI.Gtk.Rectangle _ _ newWidth _) = do
+  oldWidth' <- readIORef oldWidth
+  putStrLn "RECOMPUTING VIEWS"
+  when (oldWidth' /= newWidth) $ do -- Keep from looping forever
+    layout <- builderGetObject (builder state) castToLayout "thumbnailsLayout"
+    containerForeach layout (containerRemove layout)
+    numPages <- pageAdjustment state `get` adjustmentUpper
+    let width = newWidth `div` columns
+        height = heightFromWidth width
+        numRows = round numPages `div` columns + 1
+    putStrLn $ "RECOMPUTING THUMBS" ++ show (numPages, newWidth, width, height, numRows)
+    layoutSetSize layout newWidth (height*numRows)
+    () <- sequence_ [ do
+      let page = columns*row+col+1
+      view <- makeView state (const page) (postDrawBorder page state)
+      widgetSetSizeRequest view width height
+      layoutPut layout view (col*width) (row*height)
+      view `widgetAddEvents` [ButtonPressMask, ButtonReleaseMask]
+      view `on` buttonReleaseEvent $ tryEvent $
+           liftIO $ pageAdjustment state `set` [adjustmentValue := fromIntegral page]
+      | row <- [0..numRows-1], col <- [0..3]]
+    widgetShowAll layout
+    writeIORef oldWidth newWidth
+    return ()
+
+gotoSlideDialog state = do
+  dialog <- builderGetObject (builder state) castToDialog "pageDialog"
+  entry <- builderGetObject (builder state) castToSpinButton "pageDialogSpinButton"
+  adjustment <- builderGetObject (builder state) castToAdjustment "pageDialogAdjustment"
+  label <- builderGetObject (builder state) castToLabel "pageDialogLabel"
+  pageNum <- pageAdjustment state `get` adjustmentValue
+  pageMax <- pageAdjustment state `get` adjustmentUpper
+  adjustment `set` [adjustmentValue := pageNum, adjustmentUpper := pageMax]
+  label `set` [labelText := "Go to slide (1-" ++ show (round pageMax) ++ "):"]
+  entry `on` entryActivate $ dialogResponse dialog ResponseOk
+  widgetShowAll dialog
+  r <- dialogRun dialog
+  value <- entry `get` spinButtonValue
+  when (r == ResponseOk) $ pageAdjustment state `set` [adjustmentValue := value]
+  putStrLn (show r)
+  widgetHide dialog
+
+-- TODO: left and right mouse click for forward and backward
+handleKey :: State -> [Modifier] -> String -> IO Bool
+handleKey state [Graphics.UI.Gtk.Control] "q" = mainQuit >> return True
+handleKey state [] key | key `elem` ["left", "up", "page_up", "backspace"] =
+  pageAdjustment state `set` [adjustmentValue :~ (+(negate 1))] >> return True
+handleKey state [] key | key `elem` ["right", "down", "page_down", "right", "space", "return"] =
+  pageAdjustment state `set` [adjustmentValue :~ (+1)] >> return True
+handleKey state [] "home" = pageAdjustment state `set` [adjustmentValue := 0] >> return True
+handleKey state [] "end" = pageAdjustment state `get` adjustmentUpper >>= \p -> pageAdjustment state `set` [adjustmentValue := p] >> return True
+handleKey state [] "tab" = builderGetObject (builder state) castToNotebook "presenterWindowNotebook" >>= (`set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)]) >> return True
+handleKey state [] "r" = atomicWriteIORef (document state) Nothing >>= \() -> return True
+handleKey state [] "p" = modifyIORef' (timer state) toggleTimer >> return True
+handleKey state [] "pause" = modifyIORef' (timer state) toggleTimer >> return True
+{-
+handleKey state [] "bracketleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 20))] >> return True
+handleKey state [] "bracketright" = presenterPaned state `set` [panedPosition :~ (+20)] >> return True
+handleKey state [Shift] "braceleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 1))] >> return True
+handleKey state [Shift] "braceright" = presenterPaned state `set` [panedPosition :~ (+1)] >> return True
+-}
+handleKey state [Graphics.UI.Gtk.Control] "o" = do
+    --dialog <- builderGetObject (builder state) castToFileChooserDialog "fileOpenDialog"
+    dialog <- fileChooserDialogNew Nothing Nothing FileChooserActionOpen [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
+    --dialog `on` response $ handleResponce dialog
+    fileChooserSetURI dialog =<< readIORef (documentURL state)
+--fileChooserAddFilter
+    widgetShowAll dialog
+    r <- dialogRun dialog
+    when (r == ResponseOk) $ do
       (uri : _) <- fileChooserGetURIs dialog
       -- Note ordering to maintain thread safety
       () <- atomicWriteIORef (documentURL state) uri
       () <- atomicWriteIORef (document state) Nothing
       -- Pages will be reloaded by render thread
-      widgetDestroy dialog
-    handleResponce dialog _ = widgetDestroy dialog
-    handleKey :: [Modifier] -> String -> IO Bool
-    handleKey [Graphics.UI.Gtk.Control] "q" = mainQuit >> return True
-    handleKey [] key | key `elem` ["left", "up", "page_up", "backspace"] =
-      pageAdjustment state `set` [adjustmentValue :~ (+(negate 1))] >> return True
-    handleKey [] key | key `elem` ["right", "down", "page_down", "right", "space", "return"] =
-      pageAdjustment state `set` [adjustmentValue :~ (+1)] >> return True
-    handleKey [] "home" = pageAdjustment state `set` [adjustmentValue := 0] >> return True
-    handleKey [] "end" = pageAdjustment state `get` adjustmentUpper >>= \p -> pageAdjustment state `set` [adjustmentValue := p] >> return True
-    handleKey [] "tab" = topNotebook state `set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)] >> return True
-    handleKey [] "r" = atomicWriteIORef (document state) Nothing >>= \() -> return True
-    handleKey [] "bracketleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 20))] >> return True
-    handleKey [] "bracketright" = presenterPaned state `set` [panedPosition :~ (+20)] >> return True
-    handleKey [] "p" = modifyIORef' (timer state) toggleTimer >> return True
-    handleKey [] "pause" = modifyIORef' (timer state) toggleTimer >> return True
-    handleKey [Shift] "braceleft" = presenterPaned state `set` [panedPosition :~ max 0 . (+(negate 1))] >> return True
-    handleKey [Shift] "braceright" = presenterPaned state `set` [panedPosition :~ (+1)] >> return True
-    handleKey [Graphics.UI.Gtk.Control] "o" = do
-        dialog <- fileChooserDialogNew Nothing Nothing FileChooserActionOpen [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
-        dialog `on` response $ handleResponce dialog
-        widgetShowAll dialog
-        return True
-    handleKey [Graphics.UI.Gtk.Control] "g" = gotoSlideDialog state >> return True
-    handleKey [] "b" = do b <- readIORef (videoMute state)
-                          writeIORef (videoMute state) $ if b == MuteBlack then MuteOff else MuteBlack
-                          return True
-    handleKey [] "w" = do b <- readIORef (videoMute state)
-                          writeIORef (videoMute state) $ if b == MuteWhite then MuteOff else MuteWhite
-                          return True
-    handleKey [] "equal" = do doc <- readIORef (document state)
-                              case doc of
-                                Nothing -> return True
-                                Just doc -> panedStops (presenterPaned state) doc >> return True
-    handleKey mods name = (putStrLn $ "KeyEvent:"++show mods ++ name) >> return False
+      return ()
+    widgetDestroy dialog
+    return True
+handleKey state [Graphics.UI.Gtk.Control] "g" = gotoSlideDialog state >> return True
+handleKey state [] "b" = do b <- readIORef (videoMute state)
+                            writeIORef (videoMute state) $ if b == MuteBlack then MuteOff else MuteBlack
+                            return True
+handleKey state [] "w" = do b <- readIORef (videoMute state)
+                            writeIORef (videoMute state) $ if b == MuteWhite then MuteOff else MuteWhite
+                            return True
+handleKey state [] "f" = do f <- readIORef (fullscreen state)
+                            mapM_ (if f then windowUnfullscreen else windowFullscreen) =<< mainWindows state
+                            -- TODO: mixed fullscreen?
+                            writeIORef (fullscreen state) $ not f
+                            return True
+handleKey state [] "t" = do t <- readIORef (duration state)
+                            writeIORef (timer state) (Paused t)
+                            return True
+{-
+handleKey state [] "equal" = do doc <- readIORef (document state)
+                                case doc of
+                                  Nothing -> return True
+                                  Just doc -> panedStops (presenterPaned state) doc >> return True
+-}
+handleKey state mods name = (putStrLn $ "KeyEvent:"++show mods ++ name) >> return False
 
 panedStops paned document = do
   maxPos <- liftM fromIntegral $ paned `get` panedMaxPosition
@@ -358,9 +446,9 @@ displayTime label state (Paused microseconds) = displayTime' label state True mi
 displayTime label state (Counting microseconds) = getMicroseconds >>= displayTime' label state False . (microseconds-)
 displayTime' :: Label -> State -> Bool -> Integer -> IO ()
 displayTime' label state paused microseconds = do
-  warning <- readIORef (warningTime state)
+  warning' <- readIORef (warning state)
   let color | microseconds < 0 = Color 0x8888 0x3333 0xffff {-purple-}
-            | microseconds < warning = Color 0xffff 0x0000 0x0000 {-red-}
+            | microseconds < warning' = Color 0xffff 0x0000 0x0000 {-red-}
             | otherwise = Color 0xffff 0xffff 0xffff
   set label [labelText := formatTime microseconds ++ (if paused then " (paused)" else ""),
              labelAttributes := [AttrSize 0 (negate 1) 60, AttrForeground 0 (negate 1) color]]

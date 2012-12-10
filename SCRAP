@@ -22,6 +22,7 @@
         --        putStrLn $ show text
         --        putStrLn "END"
         --        ) annotMappings
+        page_get_mapping_annotation
 
 -- Info about windows
 --windowPresent :: WindowClass self => self -> IO ()
