@@ -32,3 +32,7 @@
   --Rectangle _ _ width height <- screenGetMonitorGeometry screen 0
 --widgetSetSizeRequest area (truncate width) (truncate height)
 --windowSetPosition window WinPosCenter
+
+
+-- Adjust file chooser
+--fileChooserAddFilter :: FileChooserClass self => self -> FileFilter -> IO ()

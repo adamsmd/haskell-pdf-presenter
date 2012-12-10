@@ -15,7 +15,7 @@ import Graphics.Rendering.Cairo
 import Graphics.Rendering.Cairo.Types
 --import Graphics.Rendering.Pango
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.Gdk.GC (gcNew, gcGetValues, gcSetValues, foreground, lineWidth)
+import Graphics.UI.Gtk.Gdk.GC (GC, gcNew, gcGetValues, gcSetValues, foreground, lineWidth)
 import Graphics.UI.Gtk.Poppler.Document
 import Graphics.UI.Gtk.Poppler.Page
 --import Graphics.UI.Gtk.Poppler.Annot
@@ -58,10 +58,10 @@ data Config = Config {
 
 data TimerState = Counting Integer{-end time-} | Paused Integer{-seconds-}
 
-data Blanking = BlankNone | BlankBlack | BlankWhite
+data VideoMuteState = MuteOff | MuteBlack | MuteWhite deriving (Eq)
 data State = State
  { timer :: IORef TimerState -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
- , blanking :: IORef Blanking
+ , videoMute :: IORef VideoMuteState
  , documentURL :: IORef String -- TODO: Maybe
  , warningTime :: IORef Integer{-microseconds-}
  -- split ratio
@@ -94,7 +94,7 @@ guiMain file = do
   -- Shared state
   state <- return State
     `ap` newIORef (Paused (6 * 1000 * 1000))
-    `ap` newIORef BlankNone
+    `ap` newIORef MuteOff
     `ap` newIORef ("file://"++file)
     `ap` newIORef (3 * 1000 * 1000)
     `ap` newIORef Map.empty {-views-}
@@ -108,7 +108,7 @@ guiMain file = do
   -- Audience window
   -------------------
   do window <- makeWindow state
-     view <- makeView state id False
+     view <- makeView state id (postDrawVideoMute state)
      window `containerAdd` view
 
   -------------------
@@ -143,7 +143,7 @@ guiMain file = do
                    layoutSetSize layout newWidth (height*numRows)
                    () <- sequence_ [ do
                      let page = columns*row+col+1
-                     view <- makeView state (const page) True
+                     view <- makeView state (const page) (postDrawBorder page state)
                      widgetSetSizeRequest view width height
                      layoutPut layout view (col*width) (row*height)
                      view `widgetAddEvents` [ButtonPressMask, ButtonReleaseMask]
@@ -168,8 +168,8 @@ guiMain file = do
 
         -- Previews
         do notebookAppendPage (topNotebook state) (presenterPaned state) "1"
-           view1 <- makeView state id False
-           view2 <- makeView state (+1) False
+           view1 <- makeView state id postDrawNone
+           view2 <- makeView state (+1) postDrawNone
            panedPack1 (presenterPaned state) view1 True True
            panedPack2 (presenterPaned state) view2 True True
 
@@ -234,6 +234,7 @@ makeWindow state = do
   window `on` keyPressEvent $ do
      mods <- eventModifier
      name <- eventKeyName
+     liftIO $ widgetQueueDraw window
      liftIO $ handleKey mods (map toLower name)
   return window where
     -- TODO: left and right mouse click for forward and backward
@@ -247,9 +248,9 @@ makeWindow state = do
     handleResponce dialog _ = widgetDestroy dialog
     handleKey :: [Modifier] -> String -> IO Bool
     handleKey [Graphics.UI.Gtk.Control] "q" = mainQuit >> return True
-    handleKey [] key | key `elem` ["Left", "Up", "Page_Up", "BackSpace"] =
+    handleKey [] key | key `elem` ["left", "up", "page_up", "backspace"] =
       pageAdjustment state `set` [adjustmentValue :~ (+(negate 1))] >> return True
-    handleKey [] key | key `elem` ["Right", "Down", "Page_Down", "Right", "space", "Return"] =
+    handleKey [] key | key `elem` ["right", "down", "page_down", "right", "space", "return"] =
       pageAdjustment state `set` [adjustmentValue :~ (+1)] >> return True
     handleKey [] "home" = pageAdjustment state `set` [adjustmentValue := 0] >> return True
     handleKey [] "end" = pageAdjustment state `get` adjustmentUpper >>= \p -> pageAdjustment state `set` [adjustmentValue := p] >> return True
@@ -267,11 +268,16 @@ makeWindow state = do
         widgetShowAll dialog
         return True
     handleKey [Graphics.UI.Gtk.Control] "g" = gotoSlideDialog state >> return True
---fileChooserAddFilter :: FileChooserClass self => self -> FileFilter -> IO ()
-    handleKey [] "x" = do doc <- readIORef (document state)
-                          case doc of
-                            Nothing -> return True
-                            Just doc -> panedStops (presenterPaned state) doc >> return True
+    handleKey [] "b" = do b <- readIORef (videoMute state)
+                          writeIORef (videoMute state) $ if b == MuteBlack then MuteOff else MuteBlack
+                          return True
+    handleKey [] "w" = do b <- readIORef (videoMute state)
+                          writeIORef (videoMute state) $ if b == MuteWhite then MuteOff else MuteWhite
+                          return True
+    handleKey [] "equal" = do doc <- readIORef (document state)
+                              case doc of
+                                Nothing -> return True
+                                Just doc -> panedStops (presenterPaned state) doc >> return True
     handleKey mods name = (putStrLn $ "KeyEvent:"++show mods ++ name) >> return False
 
 panedStops paned document = do
@@ -282,15 +288,14 @@ panedStops paned document = do
   let newPos = (fromIntegral panedHeight) * pageWidth / pageHeight
   paned `set` [panedPosition := maxPos - round newPos]
 
-makeView :: State -> (Int -> Int) -> Bool -> IO DrawingArea
-makeView state offset border = do
+makeView :: State -> (Int -> Int) -> (DrawWindow -> GC -> DrawingArea -> EventM EExpose ()) -> IO DrawingArea
+makeView state offset postDraw = do
   area <- drawingAreaNew
   widgetModifyBg area StateNormal (Color 0 0 0)
   area `on` exposeEvent $ tryEvent $ do
     n <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentUpper
-    selectedPage <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentValue
-    let p = offset selectedPage
-    when (p <= n && p >= 1) $ do
+    p <- liftIO $ liftM (offset . round) $ pageAdjustment state `get` adjustmentValue
+    when (p <= n && p >= 1) $ do -- Check ensures that preview is no rendered when on last slide
       drawWindow <- eventWindow
       size <- liftIO $ widgetGetSize area
       cache' <- liftIO $ readIORef (pages state)
@@ -312,15 +317,27 @@ makeView state offset border = do
           (width, height) <- liftIO $ drawableGetSize drawWindow
           (width', height') <- liftIO $ drawableGetSize pixmap
           liftIO $ drawDrawable drawWindow gc pixmap 0 0 ((width - width') `div` 2) ((height - height') `div` 2) width height
-          color <- liftIO $ widgetGetStyle area >>= flip styleGetBackground StateSelected
-          liftIO $ gcGetValues gc >>= \v -> gcSetValues gc (v { foreground = color, lineWidth = 6 })
-          liftIO $ when (border && p == selectedPage) $
-                 drawRectangle drawWindow gc False 0 0 width height
+      postDraw drawWindow gc area
   area `on` configureEvent $ tryEvent $ do
     (width, height) <- eventSize
     () <- liftIO $ atomicModifyIORef (views state) (\x -> (Map.insert (castToWidget area) (width, height) x, ()))
     return ()
   return area
+
+postDrawNone _ _ _ = return ()
+postDrawBorder p state drawWindow gc area = do
+  p' <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentValue
+  when (p == p') $ liftIO $ do
+    color <- widgetGetStyle area >>= flip styleGetBackground StateSelected
+    gcGetValues gc >>= \v -> gcSetValues gc (v { foreground = color, lineWidth = 6 })
+    (width, height) <- drawableGetSize drawWindow
+    drawRectangle drawWindow gc False 0 0 width height
+postDrawVideoMute state drawWindow gc area = do
+  videoMute' <- liftIO $ readIORef (videoMute state)
+  case videoMute' of
+    MuteOff -> return ()
+    MuteBlack -> liftIO $ renderWithDrawable drawWindow (setSourceRGB 0.0 0.0 0.0 >> paint)
+    MuteWhite -> liftIO $ renderWithDrawable drawWindow (setSourceRGB 1.0 1.0 1.0 >> paint)
 
 ------------------------
 -- Timer Handling

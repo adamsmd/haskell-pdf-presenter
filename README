@@ -33,6 +33,9 @@ Features (Implemented)
     - Goto slide number: Ctrl-g, double click enty box (direct edit of entry box is buggy)
   - Timer control:
     - Toggle pause: p, pause
+  - Mute:
+    - Toggle white: w
+    - Toggle black: b
   - Files:
     - Reload file: r
     - Open file: Ctrl-o
@@ -51,24 +54,28 @@ Features (Implemented)
 Features (TODO)
 ==================
 
+Sync with Audio recording (audio mark?)
 If single screen, then put audience on top
-+Blanking
++Mute status in meta-data
 +Hide mouse
-+Soft pause
++Soft pause (Paused vs Stopped)
 Swap screens
 Click on audience = advance slide
 Click on timer = adjust time (?)
 Timer:
+  Dialog: warning time, total time, time remaining (use grid (labels on left, entries on right); same for slide selection)
   +command line option
   Add 1 minute: + (?)
   +Reset timer: t
   Wall clock
   Time elapsed
 Command line:
-+Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l): use instead of refresh screen
++Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l):
+  use instead of refresh screen
+  full screen all (some?)
 History: Alt-left, Alt-right, XF86Back, XF86Forward
 Auto-Stops on preview panes:
-  +, -, =
+  +, -, =, ctrl--, ctrl-+ for small movement
 Record slide timing (print to stdout?)
   Print to stdout as you go
   Pause recording (R?) - show status in meta-data
