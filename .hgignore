@@ -1,0 +1,10 @@
+# use glob syntax.
+syntax: glob
+
+libs/*
+programs/*
+*~
+*.o
+*.p_o
+*.hp
+*.hi

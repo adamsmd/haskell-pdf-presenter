@@ -1,3 +1,11 @@
+***********
+* WARNING *
+***********
+
+By default this application disables both the screen saver and
+automatic screen dimming.  If you want to conserve battery,
+then pass the "TODO" flag or press "TODO".
+
 ======================
 Features (Implemented)
 ======================
@@ -5,22 +13,33 @@ Features (Implemented)
 - Presenter view
   - Metadata:
     - Fonts are big (60pt = 5 * 12pt)
+    - Resizeable
     - Timer:
+      - Grows to fit size (usefull for session chairs)
       - Colors: white, red (warning), purple (overtime)
           Yeah, these colors are a bit strange, but I've chosen them to
           be easily distinguishale even in paripheral vision or at a
           glance.  I don't know how well they work for color-blind
           people.  Feedback is welcome.
       - Double click to configure timer
+        - Current remaining time
+        - Initial time
+        - Warning time
     - Slide counter
       - Double click to go to slide
     - Mute status
     - Timer status
+      - When paused (but not stopped) automatically goes to running if user
+        goes forward or backward one slide.  Changing slide in other ways does not unpause.
+      - NOTE: to start timer but stay on first slide, just hit the back key
   - Preview
   - Thumbnails
     - Current slide hilighted
     - Click to go to slide
     - Mouse wheel scrolls instead of changes slide
+
+- Audience view
+  - Mouse hides after ~3 seconds
 
 - Rendering
   - Separeate rendering thread
@@ -29,83 +48,129 @@ Features (Implemented)
 
 - Keybindings:
   - Switching slides:
-    - Forward slide: space, page down, enter, right arrow, down arrow
-    - Backward slide: back space, page up, left arrow, up arrow
+    - Forward slide (and unpause): space, page down, enter, right arrow, down arrow
+    - Backward slide (and unpause): back space, page up, left arrow, up arrow
     - First slide: home
     - Last slide: end
     - Goto slide number: Ctrl-g, double click enty box (direct edit of entry box is buggy)
   - Timer control:
     - Toggle pause: p, pause
+    - Reset timer: t
+    - Open timer dialog: Ctrl-t
   - Mute:
     - Toggle white: w
     - Toggle black: b
-  - Files:
-    - Reload file: r
-    - Open file: Ctrl-o
   - Presenter screen:
     - Switch views: tab
-    - Change preview percentage: [, ], Shift-[ (minor), Shift-] (minor)
+    - Change preview percentage: [, ], Shift-[ (minor), Shift-] (minor), = (standard stops)
+      - Standard stops: 0, best left, 1/3, 1/2, 2/3, best right, 1
+    - Change preview percentage to standard
+  - Files:
+    - Reload file: Ctrl-r
+    - Open file: Ctrl-o
   - Quit: Alt-F4, Ctrl-q
+  - Enter fullscreen: f, F11, Alt-Enter, Control-l
+  - Exit fullscreen: Escape, f, F11, Alt-Enter, Control-l
+  - Help/About dialog: h, ?
 
 - Command line:
-  - one files as (required) argument
+  - Zero or one files as argument:
+    - NOTE: Zero files is useful for creating a simple timer with no slides
+  - Initial time: --durations
+  - Warning time: --warning
+  - Initial slide: --initial-slide
+  - Initial mute: --mute-black, --mute-white, --mute-off
+  - Start in fullscreen: --fullscreen, -f
+  - Help: --help, -h, -?
+  - Compression level: --compress
 
 - Since poppler is not thread safe (see https://bugs.freedesktop.org/show_bug.cgi?id=50992),
   all poppler work is done in the render thread or in a postGUISync from the render thread
+
+- Disables screen saver when running in fullscreen mode
+  - WARNING: This is done by programatically giggling the mouse by zero pixels (even when running in the background).
+    This may lead to other programs thinking the mouse is constantly moving
+    (e.g. a video player may not dim the background or hide the mouse).
+    I haven't found any programs where this is an actual problem, but it is a possibility.
 
 ==================
 Features (TODO)
 ==================
 
-Sync with Audio recording (audio mark?)
+NOTE: Memory performance is *much* better 
+
+Shift to jump by ten
+=(Default timer of zero?)
++Freeze (it's like a mute mode)
++Notes mode
++Rendering status icon
+Overlay (skipped on back)
+Movies
+Black slide after end
+Single screen
+
+Config dialog (for compression(ick requires reload), anti-screen saver)
+
+++About dialog w/ help - on ?/h/ctrl-h key
+++Better error messages
+++Filter cache
+  - Wipe on reload
++Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
+Command line split percentage needs to be one of the stops
 If single screen, then put audience on top
-++Hide mouse: only in full screen mode?
-++Soft pause (Paused vs Stopped)
 Swap screens
 Click on audience = advance slide
-Click on timer = adjust time (?)
+Scroll: Right/Down vs Left/Up
+scroll up/down (zoom presenter(?))
+mouse wheel? select slide? select color? zoom?
 Timer:
-  Dialog: warning time, total time, time remaining (use grid (labels on left, entries on right); same for slide selection)
-  +command line option
-  +Reset timer: t
-  Wall clock
+  ++Initial status
+  Wall clock (mode?)
   Time elapsed
-Command line:
-+Toggle Fullscreen (F, F11, Alt-Enter, Ctrl-l):
+Toggle Fullscreen:
   use instead of refresh screen
   full screen all (some?)
   Menubar shadow:
     https://bugs.launchpad.net/ubuntu/+source/unity/+bug/967193
     Focus (bring to front?) audience window on either one being focused (brought to front?)
-+Ctrl-Z minimizes
-+Resizeable meta-data
-  +Command line option to change base font
++Ctrl-Z minimizes:
+  Send-to-back or minimize button: ctrl-z?
++Command line option to change base font of metadata
 History: Alt-left, Alt-right, XF86Back, XF86Forward
 Auto-Stops on preview panes:
   +, -, =, ctrl--, ctrl-+ for small movement
-Record slide timing (print to stdout?)
-  Record everything except window manager events
-  Print to stdout as you go
-  Pause recording (R?) - show status in meta-data
-  Print timer status changes
-  Print presenter dispaly changes
-Replay slides (status? three-quarters circle arrow? recycle symbol?):
-  read from stdin or file or cmd line
-  Start/stop/rewind replay (status?)
-    Separate dialog?
-Multiple pdf files:
-  store filename and current slide number of non-loaded
-  Switch via Ctrl-TAB
-  Seperate timers?
-Annotation mode (status?)
-Note mode (status? vertically divided box? SQUARE WITH LEFT HALF BLACK?):
++Note mode (status? vertically divided box? SQUARE WITH LEFT HALF BLACK?):
   Keyboard toggle: /, |
   only show left half in thumbs and audience and preview next, but show right half in preview current
   guess on startup based on aspect ratio (>= 2) (fails if vertical pages)
-About dialog
-Scroll: Right/Down vs Left/Up
-Bounded pre-render: Maybe Int (number of slides to pre-render (2/3 will be in front, 1/3 will be behind))
-+Screen saver:
+
+      -u, --current-size=N          Percentage of the presenter screen to be used for the current slide. (Default 60)
+      -s, --switch-screens          Switch the presentation and the presenter screen.
+      -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.
+      -z, --disable-compression     Disable the compression of slide images to trade memory consumption for speed. (Avg. factor 30)
+
+Any key gets out of mute mode?
+test if works on MS Windows
+  Use of URI may be a problem
+  Basename may be a problem
+zoom?
+drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
+hilight cursor? big cursor? cursor shape?
+mouse cursor on audience vs presenter screen (click on audience, means next, on presenter means select)
+
+Does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
+What would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
+
+Page numbers on each tile in tile view
+
+switch to demo
+vim or arrow key navigation on overview screen
+
+================
+Features (non-active)
+================
+
+Screen saver:
   xdg-screensaver suspend WindowID
   xset -dpms (avoid dimming?)
   xset s off
@@ -117,57 +182,45 @@ Bounded pre-render: Maybe Int (number of slides to pre-render (2/3 will be in fr
   look in mplayer source code
   move mouse pointer?
   +displayGetPointer/displayWarpPointer/windowGetScreen/screenGetDisplay
-'Escape' exits full screen instead of quits
-Default preview to one of the stops: best left, 1/3, 1/2, 2/3, best right
-Resizeable meta-data (  let attrs = 
-scale font to fit)
 
-      -u, --current-size=N          Percentage of the presenter screen to be used for the current slide. (Default 60)
-      -s, --switch-screens          Switch the presentation and the presenter screen.
-      -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.
-      -z, --disable-compression     Disable the compression of slide images to trade memory consumption for speed. (Avg. factor 30)
+Record slide timing (print to stdout?)
+  Record everything except window manager events
+  Print to stdout as you go
+  Pause recording (R?) - show status in meta-data
+  Print timer status changes
+  Print presenter dispaly changes
 
-But icons on timer dialog
+Replay slides (status? three-quarters circle arrow? recycle symbol?):
+  read from stdin or file or cmd line
+  Start/stop/rewind replay (status?)
+    Separate dialog?
 
--- Look at fullscreen.vala
+Multiple pdf files:
+  store filename and current slide number of non-loaded
+  Switch via Ctrl-TAB
+  Seperate timers?
 
--- Time tracking mode
--- Any key gets out of mute mode?
--- Store shortcuts in F11 keys (or alpha keys? shifted?)
--- help, h, ?
--- scroll up/down (zoom presenter(?): duplicate, timer, next slide, minor overview, major overview)
+Annotation mode (status?)
 
--- Timer:
--- initial page (for startup)
--- start counter with "back"
--- pause timer
--- elapsed vs remaining time vs time of day
+Set boarder of time on even seconds
 
--- hyperlinks (mouse cursor when hover): both Pdf-Presenter and pympress are useful to learn from here
--- test if works on MS Windows
---  Use of URI may be a problem
---  Basename may be a problem
--- zoom?
--- drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
--- "Yes" button
 -- overview in the presenter view:
 --   - possibly along with current
 --   - could have cool zoom out effect
 --   - partial zoom out
--- windowed (non-fullscreen)?
--- switch to demo
--- vim or arrow key navigation on overview screen
--- hilight cursor? big cursor? cursor shape?
--- mouse wheel? select slide? select color? zoom?
--- mouse cursor on audience vs presenter screen (click on audience, means next, on presenter means select)
--- set boarder of time on even seconds
--- send-to-back or minimize button: ctrl-z?
 
--- does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
--- what would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
+-- "Yes" button
 
--- page numbers on each tile in tile view
+-- hyperlinks (mouse cursor when hover): both Pdf-Presenter and pympress are useful to learn from here
 
--- adjust ending time
--- adjust durration
--- end time = start time + durration (dynamically update?)
+-- Store shortcuts in F11 keys (or alpha keys? shifted?)
+
+Sync with Audio recording (audio mark?)
+
+================
+Inspired by
+================
+pdfpc: http://davvil.github.com/pdfpc/
+pdf-presenter-console: http://westhoffswelt.de/projects/pdf_presenter_console.html
+pympress
+
