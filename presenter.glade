@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <!-- interface-requires gtk+ 3.0 -->
-  <object class="GtkAction" id="action1"/>
+  <object class="GtkAction" id="dummyAction"/>
   <object class="GtkAboutDialog" id="aboutDialog">
     <property name="can_focus">False</property>
     <property name="border_width">5</property>
@@ -12,7 +12,6 @@
     <property name="copyright" translatable="yes">Copyright 2012, Michael D. Adams</property>
     <property name="website">http://michaeldadams.org</property>
     <property name="website_label" translatable="yes">http://michaeldadams.org</property>
-    <property name="license_type">gpl-2-0</property>
     <child internal-child="vbox">
       <object class="GtkBox" id="aboutdialog-vbox1">
         <property name="can_focus">False</property>
@@ -31,13 +30,16 @@
           </packing>
         </child>
         <child>
-          <object class="GtkTable" id="grid1">
+          <object class="GtkTable" id="keybindingsTable">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <property name="n_rows">14</property>
             <property name="n_columns">5</property>
             <property name="column_spacing">4</property>
             <property name="row_spacing">4</property>
+            <child>
+              <placeholder/>
+            </child>
             <child>
               <placeholder/>
             </child>
@@ -696,9 +698,6 @@ Shift-] (small adjustments)</property>
                 <property name="bottom_attach">9</property>
               </packing>
             </child>
-            <child>
-              <placeholder/>
-            </child>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -712,41 +711,10 @@ Shift-] (small adjustments)</property>
   <object class="GtkWindow" id="audienceWindow">
     <property name="can_focus">False</property>
     <property name="title" translatable="yes">PDF Presenter</property>
-    <property name="default_width">400</property>
-    <property name="default_height">300</property>
+    <property name="default_width">600</property>
+    <property name="default_height">450</property>
     <child>
       <placeholder/>
-    </child>
-  </object>
-  <object class="GtkMessageDialog" id="errorDialog">
-    <property name="can_focus">False</property>
-    <property name="border_width">5</property>
-    <property name="type_hint">dialog</property>
-    <property name="skip_taskbar_hint">True</property>
-    <property name="message_type">error</property>
-    <property name="buttons">close</property>
-    <property name="text" translatable="yes">Invalid time format: </property>
-    <child internal-child="vbox">
-      <object class="GtkBox" id="messagedialog-vbox">
-        <property name="can_focus">False</property>
-        <property name="orientation">vertical</property>
-        <property name="spacing">2</property>
-        <child internal-child="action_area">
-          <object class="GtkButtonBox" id="messagedialog-action_area">
-            <property name="can_focus">False</property>
-            <property name="layout_style">end</property>
-          </object>
-          <packing>
-            <property name="expand">False</property>
-            <property name="fill">True</property>
-            <property name="pack_type">end</property>
-            <property name="position">0</property>
-          </packing>
-        </child>
-        <child>
-          <placeholder/>
-        </child>
-      </object>
     </child>
   </object>
   <object class="GtkAdjustment" id="pageDialogAdjustment">
@@ -776,6 +744,7 @@ Shift-] (small adjustments)</property>
                 <property name="label">gtk-cancel</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <property name="can_default">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
               </object>
@@ -813,6 +782,7 @@ Shift-] (small adjustments)</property>
           <object class="GtkHBox" id="pageDialogBox">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
+            <property name="spacing">2</property>
             <child>
               <object class="GtkLabel" id="pageDialogLabel">
                 <property name="visible">True</property>
@@ -928,8 +898,7 @@ Shift-] (small adjustments)</property>
               <placeholder/>
             </child>
             <child>
-              <object class="GtkEventBox" id="eventbox2">
-                <property name="visible">True</property>
+              <object class="GtkEventBox" id="videoMuteEventBox">
                 <property name="can_focus">False</property>
                 <property name="visible_window">False</property>
                 <child>
@@ -954,14 +923,11 @@ Shift-] (small adjustments)</property>
             </child>
             <child>
               <object class="GtkEventBox" id="noteModeEventBox">
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="visible_window">False</property>
                 <child>
                   <object class="GtkLabel" id="noteModeLabel">
-                    <property name="visible">True</property>
                     <property name="can_focus">False</property>
-                    <property name="yalign">0</property>
                     <property name="label" translatable="yes">◧</property>
                     <property name="justify">center</property>
                     <attributes>
@@ -982,7 +948,6 @@ Shift-] (small adjustments)</property>
             </child>
             <child>
               <object class="GtkEventBox" id="recordingStatusEventBox">
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="visible_window">False</property>
                 <child>
@@ -1008,7 +973,6 @@ Shift-] (small adjustments)</property>
             </child>
             <child>
               <object class="GtkEventBox" id="timerStatusEventBox">
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="visible_window">False</property>
                 <child>
@@ -1034,7 +998,6 @@ Shift-] (small adjustments)</property>
             </child>
             <child>
               <object class="GtkEventBox" id="slideEventBox">
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="visible_window">False</property>
                 <child>
@@ -1062,7 +1025,6 @@ Shift-] (small adjustments)</property>
             <child>
               <object class="GtkFixed" id="metadata.rightHSpacer">
                 <property name="width_request">60</property>
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
               </object>
               <packing>
@@ -1077,7 +1039,6 @@ Shift-] (small adjustments)</property>
             <child>
               <object class="GtkFixed" id="metadata.leftHSpacer">
                 <property name="width_request">60</property>
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
               </object>
               <packing>
@@ -1091,7 +1052,6 @@ Shift-] (small adjustments)</property>
             </child>
             <child>
               <object class="GtkFixed" id="metadata.leftVExpander">
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
               </object>
               <packing>
@@ -1102,7 +1062,6 @@ Shift-] (small adjustments)</property>
             <child>
               <object class="GtkFixed" id="metadata.rightVExpander">
                 <property name="width_request">60</property>
-                <property name="visible">True</property>
                 <property name="can_focus">False</property>
               </object>
               <packing>
@@ -1112,8 +1071,7 @@ Shift-] (small adjustments)</property>
               </packing>
             </child>
             <child>
-              <object class="GtkNotebook" id="notebook1">
-                <property name="visible">True</property>
+              <object class="GtkNotebook" id="timeNotebook">
                 <property name="can_focus">False</property>
                 <property name="show_tabs">False</property>
                 <property name="show_border">False</property>
@@ -1140,7 +1098,7 @@ Shift-] (small adjustments)</property>
                   <placeholder/>
                 </child>
                 <child>
-                  <object class="GtkLabel" id="timeLabel2">
+                  <object class="GtkLabel" id="hiddenTimeLabel">
                     <property name="visible">True</property>
                     <property name="can_focus">False</property>
                     <property name="single_line_mode">True</property>
@@ -1180,19 +1138,20 @@ Shift-] (small adjustments)</property>
     <property name="border_width">5</property>
     <property name="type_hint">dialog</property>
     <child internal-child="vbox">
-      <object class="GtkBox" id="timerDialogBox">
+      <object class="GtkBox" id="dialog-vbox4">
         <property name="can_focus">False</property>
         <property name="orientation">vertical</property>
         <property name="spacing">2</property>
         <child internal-child="action_area">
-          <object class="GtkButtonBox" id="dialog-action_area1">
+          <object class="GtkButtonBox" id="dialog-action_area4">
             <property name="can_focus">False</property>
             <property name="layout_style">end</property>
             <child>
-              <object class="GtkButton" id="cancelButton">
+              <object class="GtkButton" id="timerDialogCancelButton">
                 <property name="label">gtk-cancel</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
+                <property name="can_default">True</property>
                 <property name="receives_default">True</property>
                 <property name="use_stock">True</property>
               </object>
@@ -1203,7 +1162,7 @@ Shift-] (small adjustments)</property>
               </packing>
             </child>
             <child>
-              <object class="GtkButton" id="okButton">
+              <object class="GtkButton" id="timerDialogOkButton">
                 <property name="label">gtk-ok</property>
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
@@ -1227,178 +1186,367 @@ Shift-] (small adjustments)</property>
           </packing>
         </child>
         <child>
-          <object class="GtkTable" id="timerDialogTable">
+          <object class="GtkVBox" id="timerDialogBox">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
-            <property name="n_columns">5</property>
-            <property name="column_spacing">5</property>
+            <property name="spacing">10</property>
             <child>
-              <object class="GtkLabel" id="remainingTimeLabel">
+              <object class="GtkTable" id="timerDialogTable1">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="xalign">1</property>
-                <property name="label" translatable="yes">Remaining time:</property>
+                <property name="column_spacing">5</property>
+                <child>
+                  <object class="GtkLabel" id="elapsedTimeLabel">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">_Elapsed Time:</property>
+                    <property name="use_underline">True</property>
+                    <property name="mnemonic_widget">elapsedTimeEntry</property>
+                    <property name="single_line_mode">True</property>
+                  </object>
+                  <packing>
+                    <property name="top_attach">1</property>
+                    <property name="bottom_attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkEntry" id="elapsedTimeEntry">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="invisible_char">•</property>
+                    <property name="activates_default">True</property>
+                    <property name="width_chars">8</property>
+                    <property name="xalign">1</property>
+                    <property name="invisible_char_set">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">1</property>
+                    <property name="top_attach">1</property>
+                    <property name="bottom_attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="remainingTimeLabel">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">_Remaining Time:</property>
+                    <property name="use_underline">True</property>
+                    <property name="mnemonic_widget">remainingTimeEntry</property>
+                    <property name="single_line_mode">True</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkEntry" id="remainingTimeEntry">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="invisible_char">•</property>
+                    <property name="activates_default">True</property>
+                    <property name="width_chars">8</property>
+                    <property name="xalign">1</property>
+                    <property name="invisible_char_set">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="startTimeLabel">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">S_tart Time:</property>
+                    <property name="use_underline">True</property>
+                    <property name="mnemonic_widget">startTimeEntry</property>
+                    <property name="single_line_mode">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">3</property>
+                  </packing>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="warnTimeLabel">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">_Warn Time:</property>
+                    <property name="use_underline">True</property>
+                    <property name="mnemonic_widget">warnTimeEntry</property>
+                    <property name="single_line_mode">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">3</property>
+                    <property name="top_attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="endTimeLabel">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">E_nd Time:</property>
+                    <property name="use_underline">True</property>
+                    <property name="mnemonic_widget">endTimeEntry</property>
+                    <property name="single_line_mode">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">3</property>
+                    <property name="top_attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <object class="GtkEntry" id="startTimeEntry">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="invisible_char">•</property>
+                    <property name="activates_default">True</property>
+                    <property name="width_chars">8</property>
+                    <property name="xalign">1</property>
+                    <property name="invisible_char_set">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">4</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkEntry" id="warnTimeEntry">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="invisible_char">•</property>
+                    <property name="activates_default">True</property>
+                    <property name="width_chars">8</property>
+                    <property name="xalign">1</property>
+                    <property name="invisible_char_set">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">4</property>
+                    <property name="top_attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkEntry" id="endTimeEntry">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="invisible_char">•</property>
+                    <property name="activates_default">True</property>
+                    <property name="width_chars">8</property>
+                    <property name="xalign">1</property>
+                    <property name="invisible_char_set">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">4</property>
+                    <property name="top_attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="timerDialogSpacer">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="label" translatable="yes">	</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">2</property>
+                  </packing>
+                </child>
               </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
             </child>
             <child>
-              <object class="GtkLabel" id="totalTimeLabel">
+              <object class="GtkTable" id="timerDialogTable2">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
-                <property name="xalign">1</property>
-                <property name="label" translatable="yes">Total time:</property>
+                <property name="column_spacing">5</property>
+                <child>
+                  <object class="GtkLabel" id="timerModeLabel">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">Timer Mode:</property>
+                    <property name="single_line_mode">True</property>
+                  </object>
+                </child>
+                <child>
+                  <object class="GtkLabel" id="displayModeLabel">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="xalign">1</property>
+                    <property name="label" translatable="yes">Display Mode:</property>
+                    <property name="single_line_mode">True</property>
+                  </object>
+                  <packing>
+                    <property name="top_attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkRadioButton" id="remainingTimeRadio">
+                    <property name="label" translatable="yes">Re_maining Time (⌛)</property>
+                    <property name="use_action_appearance">False</property>
+                    <property name="related_action">dummyAction</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">False</property>
+                    <property name="use_underline">True</property>
+                    <property name="xalign">0</property>
+                    <property name="active">True</property>
+                    <property name="draw_indicator">True</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">1</property>
+                    <property name="top_attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkRadioButton" id="12HourClockRadio">
+                    <property name="label" translatable="yes">_12 Hour Clock</property>
+                    <property name="use_action_appearance">False</property>
+                    <property name="related_action">dummyAction</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">False</property>
+                    <property name="use_underline">True</property>
+                    <property name="xalign">0</property>
+                    <property name="active">True</property>
+                    <property name="draw_indicator">True</property>
+                    <property name="group">remainingTimeRadio</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">1</property>
+                    <property name="top_attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <placeholder/>
+                </child>
+                <child>
+                  <object class="GtkRadioButton" id="elapsedTimeRadio">
+                    <property name="label" translatable="yes">E_lapsed Time (⌚)</property>
+                    <property name="use_action_appearance">False</property>
+                    <property name="related_action">dummyAction</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">False</property>
+                    <property name="use_underline">True</property>
+                    <property name="xalign">0</property>
+                    <property name="active">True</property>
+                    <property name="draw_indicator">True</property>
+                    <property name="group">remainingTimeRadio</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">2</property>
+                    <property name="top_attach">1</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkRadioButton" id="24HourClockRadio">
+                    <property name="label" translatable="yes">_24 Hour Clock</property>
+                    <property name="use_action_appearance">False</property>
+                    <property name="related_action">dummyAction</property>
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="receives_default">False</property>
+                    <property name="use_underline">True</property>
+                    <property name="xalign">0</property>
+                    <property name="active">True</property>
+                    <property name="draw_indicator">True</property>
+                    <property name="group">remainingTimeRadio</property>
+                  </object>
+                  <packing>
+                    <property name="left_attach">2</property>
+                    <property name="top_attach">2</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkHBox" id="timerDialogTimerModeBox">
+                    <property name="visible">True</property>
+                    <property name="can_focus">False</property>
+                    <property name="spacing">5</property>
+                    <child>
+                      <object class="GtkRadioButton" id="runningRadio">
+                        <property name="label" translatable="yes">R_unning (▶)</property>
+                        <property name="use_action_appearance">False</property>
+                        <property name="related_action">dummyAction</property>
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">False</property>
+                        <property name="use_underline">True</property>
+                        <property name="xalign">0</property>
+                        <property name="active">True</property>
+                        <property name="draw_indicator">True</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkRadioButton" id="pausedRadio">
+                        <property name="label" translatable="yes">_Paused (▮▮)</property>
+                        <property name="use_action_appearance">False</property>
+                        <property name="related_action">dummyAction</property>
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">False</property>
+                        <property name="use_underline">True</property>
+                        <property name="xalign">0</property>
+                        <property name="active">True</property>
+                        <property name="draw_indicator">True</property>
+                        <property name="group">runningRadio</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkRadioButton" id="stoppedRadio">
+                        <property name="label" translatable="yes">_Stopped (■)</property>
+                        <property name="use_action_appearance">False</property>
+                        <property name="related_action">dummyAction</property>
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">False</property>
+                        <property name="use_underline">True</property>
+                        <property name="xalign">0</property>
+                        <property name="active">True</property>
+                        <property name="draw_indicator">True</property>
+                        <property name="group">runningRadio</property>
+                      </object>
+                      <packing>
+                        <property name="expand">False</property>
+                        <property name="fill">True</property>
+                        <property name="position">2</property>
+                      </packing>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="left_attach">1</property>
+                    <property name="right_attach">3</property>
+                  </packing>
+                </child>
               </object>
               <packing>
-                <property name="top_attach">1</property>
-              </packing>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <object class="GtkLabel" id="warningTimeLabel">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="xalign">1</property>
-                <property name="label" translatable="yes">Warning time:</property>
-              </object>
-              <packing>
-                <property name="top_attach">2</property>
-              </packing>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <object class="GtkEntry" id="remainingTimeEntry">
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="invisible_char">•</property>
-                <property name="activates_default">True</property>
-                <property name="width_chars">8</property>
-                <property name="xalign">1</property>
-              </object>
-              <packing>
-                <property name="left_attach">1</property>
-                <property name="right_attach">2</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkEntry" id="totalTimeEntry">
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="invisible_char">•</property>
-                <property name="activates_default">True</property>
-                <property name="width_chars">1</property>
-                <property name="xalign">1</property>
-              </object>
-              <packing>
-                <property name="left_attach">1</property>
-                <property name="right_attach">2</property>
-                <property name="top_attach">1</property>
-                <property name="bottom_attach">2</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkEntry" id="warningTimeEntry">
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="invisible_char">•</property>
-                <property name="activates_default">True</property>
-                <property name="width_chars">1</property>
-                <property name="xalign">1</property>
-              </object>
-              <packing>
-                <property name="left_attach">1</property>
-                <property name="right_attach">2</property>
-                <property name="top_attach">2</property>
-                <property name="bottom_attach">3</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkRadioButton" id="timerStatusRunningRadio">
-                <property name="label" translatable="yes">_Running (▶)</property>
-                <property name="use_action_appearance">False</property>
-                <property name="related_action">action1</property>
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">False</property>
-                <property name="use_underline">True</property>
-                <property name="xalign">0</property>
-                <property name="draw_indicator">True</property>
-              </object>
-              <packing>
-                <property name="left_attach">4</property>
-                <property name="right_attach">5</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkRadioButton" id="timerStatusPausedRadio">
-                <property name="label" translatable="yes">_Paused (▮▮)</property>
-                <property name="use_action_appearance">False</property>
-                <property name="related_action">action1</property>
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">False</property>
-                <property name="use_underline">True</property>
-                <property name="xalign">0</property>
-                <property name="draw_indicator">True</property>
-                <property name="group">timerStatusRunningRadio</property>
-              </object>
-              <packing>
-                <property name="left_attach">4</property>
-                <property name="right_attach">5</property>
-                <property name="top_attach">1</property>
-                <property name="bottom_attach">2</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkRadioButton" id="timerStatusStoppedRadio">
-                <property name="label" translatable="yes">_Stopped (■)</property>
-                <property name="use_action_appearance">False</property>
-                <property name="related_action">action1</property>
-                <property name="visible">True</property>
-                <property name="can_focus">True</property>
-                <property name="receives_default">False</property>
-                <property name="use_underline">True</property>
-                <property name="xalign">0</property>
-                <property name="draw_indicator">True</property>
-                <property name="group">timerStatusRunningRadio</property>
-              </object>
-              <packing>
-                <property name="left_attach">4</property>
-                <property name="right_attach">5</property>
-                <property name="top_attach">2</property>
-                <property name="bottom_attach">3</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkLabel" id="timerStatusRadioLabel">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="xalign">1</property>
-                <property name="label" translatable="yes">Timer status:</property>
-              </object>
-              <packing>
-                <property name="left_attach">3</property>
-                <property name="right_attach">4</property>
-              </packing>
-            </child>
-            <child>
-              <object class="GtkFixed" id="timerDialogSpacer1">
-                <property name="width_request">10</property>
-                <property name="sensitive">False</property>
-                <property name="can_focus">False</property>
-              </object>
-              <packing>
-                <property name="left_attach">2</property>
-                <property name="right_attach">3</property>
-                <property name="x_options"/>
+                <property name="expand">False</property>
+                <property name="fill">True</property>
+                <property name="position">1</property>
               </packing>
             </child>
           </object>
@@ -1411,8 +1559,8 @@ Shift-] (small adjustments)</property>
       </object>
     </child>
     <action-widgets>
-      <action-widget response="0">cancelButton</action-widget>
-      <action-widget response="-5">okButton</action-widget>
+      <action-widget response="0">timerDialogCancelButton</action-widget>
+      <action-widget response="-5">timerDialogOkButton</action-widget>
     </action-widgets>
   </object>
   <object class="GtkWindow" id="window1">

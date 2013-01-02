@@ -34,7 +34,8 @@ Features (Implemented)
       - NOTE: to start timer but stay on first slide, just hit the back key
   - Preview
   - Thumbnails
-    - Current slide hilighted
+    - Current slide highlighted
+    - Tooltips show slide number
     - Click to go to slide
     - Mouse wheel scrolls instead of changes slide
 
@@ -53,6 +54,8 @@ Features (Implemented)
     - First slide: home
     - Last slide: end
     - Goto slide number: Ctrl-g, double click enty box (direct edit of entry box is buggy)
+    - History back: Alt-L, XF86Back
+    - History forward: Alt-R, XF86Forward
   - Timer control:
     - Toggle pause: p, pause
     - Reset timer: t
@@ -97,9 +100,51 @@ Features (Implemented)
 Features (TODO)
 ==================
 
-NOTE: Memory performance is *much* better 
+End time
 
-Shift to jump by ten
+----
+
+Warning background color
+t - Shift t?
+Shift-p for stop
+
+stop resizing on dialogs?
+
+Ellapsed time/Timer mode
+  Dialog:
+   =12/24
+   =Mode
+   Icon for mode
+    (clock)
+    	⌚	231A Watch (wall clock)
+       	⌛	231B	 	HOURGLASS (time remaining)
+	⏰	23F0	 	ALARM CLOCK
+	⏱	23F1	 	STOPWATCH
+	⏲	23F2	 	TIMER CLOCK
+⌚  U+0231A  WATCH
+⌛  U+0231B  HOURGLASS
+⏰  U+023F0  ALARM CLOCK
+⏱  U+023F1  STOPWATCH
+⏳  U+023F3  HOURGLASS WITH FLOWING SAND
+⧖  U+029D6  WHITE HOURGLASS
+⧗  U+029D7  BLACK HOURGLASS
+
+
+-Ctrl-c: Does not work: C.catch mainGUI (\(e :: C.AsyncException) -> putStrLn (show e))
+Note mode
+Test on windows
+Naming convention
+---------
+
+cabal
+~/build/slider
+  Pens in different colors and sizes (2, 8, 32 pixels)
+  Zoom on individual slide
+Test multi-monitor on Xfce4
+
+NOTE: Memory performance is *much* better now
+
+=Shift to jump by ten
 =(Default timer of zero?)
 +Freeze (it's like a mute mode)
 +Notes mode
@@ -109,7 +154,7 @@ Movies
 Black slide after end
 Single screen
 
-Config dialog (for compression(ick requires reload), anti-screen saver)
+Config dialog (for compression(ick requires reload), anti-screen saver, mouse hiding, colors)
 
 ++About dialog w/ help - on ?/h/ctrl-h key
 ++Better error messages
@@ -118,7 +163,7 @@ Config dialog (for compression(ick requires reload), anti-screen saver)
 +Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
 Command line split percentage needs to be one of the stops
 If single screen, then put audience on top
-Swap screens
+Swap screens (just go do non-fullscreen and manually swap?)
 Click on audience = advance slide
 Scroll: Right/Down vs Left/Up
 scroll up/down (zoom presenter(?))
@@ -136,7 +181,6 @@ Toggle Fullscreen:
 +Ctrl-Z minimizes:
   Send-to-back or minimize button: ctrl-z?
 +Command line option to change base font of metadata
-History: Alt-left, Alt-right, XF86Back, XF86Forward
 Auto-Stops on preview panes:
   +, -, =, ctrl--, ctrl-+ for small movement
 +Note mode (status? vertically divided box? SQUARE WITH LEFT HALF BLACK?):
@@ -160,9 +204,6 @@ mouse cursor on audience vs presenter screen (click on audience, means next, on 
 
 Does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
 What would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
-
-Page numbers on each tile in tile view
-
 switch to demo
 vim or arrow key navigation on overview screen
 
