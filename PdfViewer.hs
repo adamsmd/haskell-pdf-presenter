@@ -31,6 +31,9 @@ import System.Locale (defaultTimeLocale)
 
 guiData = $(liftM (LitE . StringL) (runIO $ readFile "presenter.glade"))
 
+-- TODO: reset windows to default displays (or toggle if pressed again)
+-- TODO: there was a bug where
+
 data TimerState =
   Counting Integer{-starting microseconds-} Integer{-ending microseconds-} |
   Stopped Bool{-soft pause-} Integer{-elapsed microseconds-} Integer{-remaining microseconds-}
@@ -244,32 +247,40 @@ guiMain state = do
      dialog `on` response $ const $ widgetHideAll dialog
      dialog `on` deleteEvent $ liftIO (widgetHideAll dialog) >> return True
 
-  -- Make sure the screen saver doesn't start by moving the cursor
-  -- Since we move the mouse by zero pixels, this shouldn't effect the user
   -- TODO: cleanup
+  -- Special configuration for the audience window
   do w <- builderGetObject (builder state) castToWindow "audienceWindow"
      dw <- widgetGetDrawWindow w
-     blankCursor <- cursorNew BlankCursor
-     timeoutAdd (do display <- screenGetDisplay =<< windowGetScreen w
-                    (screen, _, x, y) <- displayGetPointer display
-                    displayWarpPointer display screen x y
-                    mouseTimeout' <- readIORef (mouseTimeout state)
-                    currTime <- getMicroseconds
-                    fullscreen' <- readIORef (fullscreen state)
-                    when (fullscreen' && currTime > mouseTimeout') $
-                      dw `drawWindowSetCursor` (Just blankCursor)
-                    return True) (5000{-milliseconds-})
-     w `widgetAddEvents` [PointerMotionMask]
-     oldCoordRef <- newIORef (0, 0)
-     let update = do dw `drawWindowSetCursor` Nothing
-                     writeIORef (mouseTimeout state) =<< liftM (+ 3 * 1000 * 1000) getMicroseconds
-     w `on` enterNotifyEvent $ liftIO update >> return False
-     w `on` motionNotifyEvent $ do
-           coord <- eventRootCoordinates
-           oldCoord <- liftIO $ readIORef oldCoordRef
-           liftIO $ writeIORef oldCoordRef coord
-           when (oldCoord /= coord) $ liftIO update
-           return False
+
+     -- Put audience window on second screen if present
+     do screen <- w `get` windowScreen
+        n <- screenGetNMonitors screen
+        when (n > 1) $ do Rectangle x y _ _ <- screenGetMonitorGeometry screen 1
+                          windowMove w x y
+
+     -- Make sure the screen saver doesn't start by moving the cursor
+     -- Since we move the mouse by zero pixels, this shouldn't effect the user
+     do blankCursor <- cursorNew BlankCursor
+        timeoutAdd (do display <- screenGetDisplay =<< windowGetScreen w
+                       (screen, _, x, y) <- displayGetPointer display
+                       displayWarpPointer display screen x y
+                       mouseTimeout' <- readIORef (mouseTimeout state)
+                       currTime <- getMicroseconds
+                       fullscreen' <- readIORef (fullscreen state)
+                       when (fullscreen' && currTime > mouseTimeout') $
+                         dw `drawWindowSetCursor` (Just blankCursor)
+                       return True) (5000{-milliseconds-})
+        w `widgetAddEvents` [PointerMotionMask]
+        oldCoordRef <- newIORef (0, 0)
+        let update = do dw `drawWindowSetCursor` Nothing
+                        writeIORef (mouseTimeout state) =<< liftM (+ 3 * 1000 * 1000) getMicroseconds
+        w `on` enterNotifyEvent $ liftIO update >> return False
+        w `on` motionNotifyEvent $ do
+          coord <- eventRootCoordinates
+          oldCoord <- liftIO $ readIORef oldCoordRef
+          liftIO $ writeIORef oldCoordRef coord
+          when (oldCoord /= coord) $ liftIO update
+          return False
 
   -- Schedule rendering, and start main loop
   renderThreadSoon state
@@ -291,7 +302,7 @@ recomputeViews state newWidth = do
     layoutPut layout view (col*width) (row*height)
     view `widgetAddEvents` [ButtonPressMask, ButtonReleaseMask]
     view `on` buttonReleaseEvent $ tryEvent $ liftIO $ gotoPage state (const page)
-    view `set` [widgetTooltipText := Just ("Slide " ++ show page)]
+    --view `set` [widgetTooltipText := Just ("Slide " ++ show page)] -- TODO: this triggers a bug where window drawing does not update
     | row <- [0..numRows-1], col <- [0..3]]
   widgetShowAll layout
 
@@ -559,7 +570,7 @@ postDrawBorder p state drawWindow gc area = do
     gcGetValues gc >>= \v -> gcSetValues gc (v { foreground = color, lineWidth = 6 })
     (width, height) <- drawableGetSize drawWindow
     drawRectangle drawWindow gc False 0 0 width height
-postDrawVideoMute state drawWindow gc area = do
+postDrawVideoMute state drawWindow _gc _area = do
   videoMute' <- liftIO $ readIORef (videoMute state)
   case videoMute' of
     MuteOff -> return ()
@@ -729,7 +740,6 @@ renderThread' state = do
           let scaleFactor = min (fromIntegral width  / docWidth)
                                 (fromIntegral height / docHeight)
           -- NOTE: we use 24 bits instead of 32 to cut down on size and time
-          putStrLn (show (pageNum, width, height))
           (pixels, w, h, stride) <- withImageSurface FormatRGB24
             (round $ scaleFactor * docWidth) (round $ scaleFactor * docHeight) (\surface -> do
               renderWith surface $ do scale scaleFactor scaleFactor
