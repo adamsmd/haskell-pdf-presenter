@@ -24,6 +24,7 @@ import Graphics.UI.Gtk.Poppler.Document
 import Graphics.UI.Gtk.Poppler.Page
 import Language.Haskell.TH (Exp(LitE), Lit(StringL), runIO)
 import System.Console.GetOpt
+import System.Directory (canonicalizePath)
 import System.Exit (exitSuccess, exitFailure)
 import System.FilePath (takeFileName)
 import System.Glib
@@ -149,7 +150,7 @@ main = do
 
   case getOpt Permute options args of
     (opts, [], []) -> mapM_ ($ state) opts >> guiMain state
-    (opts, [file], []) -> mapM_ ($ state) opts >> postGUIAsync (openDoc state ("file://"++file) >> return ()) >> guiMain state
+    (opts, [file], []) -> mapM_ ($ state) opts >> postGUIAsync (canonicalizePath file >>= \file' -> openDoc state ("file://"++file') >> return ()) >> guiMain state
     (_, [_,_], []) -> putStrLn ("Error: Multiple files on command line") >> putStr (usageInfo header options)
     (_, _, errors) -> putStr (unlines errors) >> putStr (usageInfo header options)
 

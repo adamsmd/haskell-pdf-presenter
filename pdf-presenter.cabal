@@ -12,6 +12,8 @@ Version:             0.1
 -- A short (one-line) description of the package.
 Synopsis:            project synopsis
 
+Description:         This application is a viewer for presenting PDF files that contain a set of slides.  See the README for instructions on using it.
+
 -- A longer description of the package.
 -- Description:         
 
@@ -50,7 +52,7 @@ Executable pdf-presenter
   Main-is: PdfViewer.hs
   
   -- Packages needed in order to build this package.
-  Build-depends: base == 4.*, bytestring >= 0.9, containers >= 0.1, filepath >= 1.0, template-haskell >= 2.2, zlib == 0.5.*,
+  Build-depends: base == 4.*, bytestring >= 0.9, containers >= 0.1, directory >= 1.0, filepath >= 1.0, template-haskell >= 2.2, zlib == 0.5.*,
                  split >= 0.1, old-locale, time >= 1.1.2.0,
                  glib, poppler == 0.12.2.*, gtk >= 0.12.2, cairo
   
