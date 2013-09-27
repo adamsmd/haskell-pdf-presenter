@@ -2,7 +2,7 @@
 Features (TODO)
 ==================
 
-Screen saver icon
+Screen saver icon (coffee cup?)
 
 End time
 
@@ -32,7 +32,11 @@ Ellapsed time/Timer mode
 ⏳  U+023F3  HOURGLASS WITH FLOWING SAND
 ⧖  U+029D6  WHITE HOURGLASS
 ⧗  U+029D7  BLACK HOURGLASS
-
+\x2615 Coffie cup (lines are too thin)
+\x263D Moon
+High voltage sign 	⚡ 	U+26A1
+ U+221E ∞ infinity
+Infinity
 
 -Ctrl-c: Does not work: C.catch mainGUI (\(e :: C.AsyncException) -> putStrLn (show e))
 Note mode
@@ -40,7 +44,6 @@ Test on windows
 Naming convention
 ---------
 
-cabal
 ~/build/slider
   Pens in different colors and sizes (2, 8, 32 pixels)
   Zoom on individual slide
@@ -48,11 +51,8 @@ Test multi-monitor on Xfce4
 
 NOTE: Memory performance is *much* better now
 
-=Shift to jump by ten
-=(Default timer of zero?)
 +Freeze (it's like a mute mode)
 +Notes mode
-+Rendering status icon
 Overlay (skipped on back)
 Movies
 Black slide after end
@@ -60,10 +60,7 @@ Single screen
 
 Config dialog (for compression(ick requires reload), anti-screen saver, mouse hiding, colors)
 
-++About dialog w/ help - on ?/h/ctrl-h key
 ++Better error messages
-++Filter cache
-  - Wipe on reload
 +Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
 Command line split percentage needs to be one of the stops
 If single screen, then put audience on top
@@ -72,10 +69,6 @@ Click on audience = advance slide
 Scroll: Right/Down vs Left/Up
 scroll up/down (zoom presenter(?))
 mouse wheel? select slide? select color? zoom?
-Timer:
-  ++Initial status
-  Wall clock (mode?)
-  Time elapsed
 Toggle Fullscreen:
   use instead of refresh screen
   full screen all (some?)
@@ -85,8 +78,6 @@ Toggle Fullscreen:
 +Ctrl-Z minimizes:
   Send-to-back or minimize button: ctrl-z?
 +Command line option to change base font of metadata
-Auto-Stops on preview panes:
-  +, -, =, ctrl--, ctrl-+ for small movement
 +Note mode (status? vertically divided box? SQUARE WITH LEFT HALF BLACK?):
   Keyboard toggle: /, |
   only show left half in thumbs and audience and preview next, but show right half in preview current
@@ -134,13 +125,17 @@ Record slide timing (print to stdout?)
   Pause recording (R?) - show status in meta-data
   Print timer status changes
   Print presenter dispaly changes
+  Implementation:?
+    Always send all events to stdout with absolute time
+    Read events from stdin and play back those events
+    For portability, events must be internal names (e.g., Advance Slide) not keyboard names (e.g. PageDown)
 
 Replay slides (status? three-quarters circle arrow? recycle symbol?):
   read from stdin or file or cmd line
   Start/stop/rewind replay (status?)
     Separate dialog?
 
-Multiple pdf files:
+Multiple pdf files: (usefull for lightning talks)
   store filename and current slide number of non-loaded
   Switch via Ctrl-TAB
   Seperate timers?
@@ -154,7 +149,8 @@ Set boarder of time on even seconds
 --   - could have cool zoom out effect
 --   - partial zoom out
 
--- "Yes" button
+-- "Yes" button: Certain keys go to certain slides or to fixed text
+ - Ctrl-Shift Y = Yes
 
 -- hyperlinks (mouse cursor when hover): both Pdf-Presenter and pympress are useful to learn from here
 
