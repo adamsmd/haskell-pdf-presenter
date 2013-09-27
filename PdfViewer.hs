@@ -108,32 +108,36 @@ options = [
 -- Utils and constants
 ----------------
 
--- TODO: document
+-- TODO: cleanup
+heightFromWidth w = w * 3 `div` 4
+numColumns = 4
+textSize = 60
 
+-- Color constants
+red = Color 0xffff 0x0000 0x0000
+purple = Color 0x8888 0x3333 0xffff
+white = Color 0xffff 0xffff 0xffff
+black = Color 0x0000 0x0000 0x0000
+
+-- Like "read" but returns "Nothing" instead of throwing an exception
+maybeRead :: (Read a) => String -> Maybe a
+maybeRead str | [(n, "")] <- reads str = Just n
+              | otherwise = Nothing
+
+-- A list of the top level windows
+mainWindows state = -- NOTE: Order of windows effects which window is on top in fullscreen
+  mapM (builderGetObject (builder state) castToWindow) ["presenterWindow", "audienceWindow"]
+
+-- Set an option to a given value when a command line flag is set
 setOption opt val = NoArg $ \state -> writeIORef (opt state) val
+
+-- Set an option based on the argument given to a command line
 argOption :: (State -> IORef a) -> String -> (String -> Maybe a) -> String -> ArgDescr (State -> IO ())
 argOption opt name f = ReqArg (\val state -> do
   case f val of
     Nothing -> putStrLn ("ERROR: Invalid argument to option \""++name++"\": "++show val) >>
                putStr ("\n" ++ (usageInfo header options)) >> exitFailure
     Just val' -> writeIORef (opt state) val')
-
-red = Color 0xffff 0x0000 0x0000
-purple = Color 0x8888 0x3333 0xffff
-white = Color 0xffff 0xffff 0xffff
-black = Color 0x0000 0x0000 0x0000
-
-maybeRead :: (Read a) => String -> Maybe a
-maybeRead str | [(n, "")] <- reads str = Just n
-              | otherwise = Nothing
-
-mainWindows state = -- NOTE: Order of windows effects which window is on top in fullscreen
-  mapM (builderGetObject (builder state) castToWindow) ["presenterWindow", "audienceWindow"]
-
--- TODO: cleanup
-heightFromWidth w = w * 3 `div` 4
-numColumns = 4
-textSize = 60
 
 ----------------
 -- Main Program
@@ -358,12 +362,12 @@ gotoPage state f = do
 -- User Event handling
 ------------------------
 
--- TODO: document
-
 -- TODO: left and right mouse click for forward and backward
 -- TODO: help dialog: Shift-right = forward by 10, etc.
 -- TODO: help dialog: Alt-left = history back, etc.
 -- TODO: help dialog: shift-p = stop
+
+-- Handler for key presses from the user
 handleKey :: State -> [Modifier] -> String -> IO Bool
 handleKey state [Control] "q" = mainQuit >> return True
 handleKey state _ "h" = builderGetObject (builder state) castToAboutDialog "aboutDialog" >>= widgetShowAll >> return True
@@ -586,6 +590,18 @@ openFileDialog state = do
   widgetDestroy dialog
   return True
 
+-- Set the video mute state and the text of the video mute status label
+modifyVideoMute state f = do
+  mute <- f =<< readIORef (videoMute state)
+  builderGetObject (builder state) castToLabel "videoMuteStatusLabel" >>= (`set` case mute of
+    MuteOff -> [labelText := "\x2600", -- U+2600 = Black sun with rays (solid center)
+                labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) black]]
+    MuteWhite -> [labelText := "\x2600", -- U+2600 = Black sun with rays (solid center)
+                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
+    MuteBlack -> [labelText := "\x263C", -- U+263C = White sun with rays (hollow center)
+                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]])
+  writeIORef (videoMute state) mute
+
 -- Open and run a modal error dialog with a textual message.
 errorDialog msg = do
   dialog <- messageDialogNew Nothing [DialogModal, DialogDestroyWithParent] MessageError ButtonsClose msg
@@ -603,19 +619,9 @@ loopDialog d m = do
 -- Views
 ------------------------
 
--- TODO: document
-
-modifyVideoMute state f = do
-  mute <- f =<< readIORef (videoMute state)
-  builderGetObject (builder state) castToLabel "videoMuteStatusLabel" >>= (`set` case mute of
-    MuteOff -> [labelText := "\x2600",
-                labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) black]]
-    MuteWhite -> [labelText := "\x2600",
-                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
-    MuteBlack -> [labelText := "\x263C",
-                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]])
-  writeIORef (videoMute state) mute
-
+-- Make a widget that displays a slide.
+--   - offset: computes the slide to display from the current slide number
+--   - postDraw: extra drawing that should be done at the end
 makeView :: State -> (Int -> Int) -> (DrawWindow -> GC -> DrawingArea -> EventM EExpose ()) -> IO DrawingArea
 makeView state offset postDraw = do
   area <- drawingAreaNew
@@ -627,26 +633,35 @@ makeView state offset postDraw = do
     liftIO $ modifyIORef (views state) (Map.delete (castToWidget area))
   return area
 
+-- Event handler for drawing a view
+--   - offset: computes the slide to display from the current slide number
+--   - postDraw: extra drawing that should be done at the end
+--   - area: the widget that needs to be redrawn
 drawView state offset postDraw area = do
+  -- Get the maximum and current slide number
   n <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentUpper
   p <- liftIO $ liftM (offset . round) $ pageAdjustment state `get` adjustmentValue
-  when (p <= n && p >= 1) $ do -- Check ensures that preview is not rendered when on last slide
+  -- Don't render if not in range.  Needed b/c the preview panel may
+  -- go out of range when on the last slide.
+  when (p <= n && p >= 1) $ do
     drawWindow <- eventWindow
     (w, h) <- liftIO $ widgetGetSize area
     cache' <- liftIO $ readIORef (pages state)
     gc <- liftIO $ gcNew drawWindow
     case Map.lookup (p, w, h) cache' of
+      -- If we haven't rendered the slide yet, then use placeholder text
       Nothing -> do
         pc <- liftIO $ widgetGetPangoContext area
         doc <- liftIO $ readIORef (document state)
         layout <- liftIO $ layoutText pc $ case doc of
-          Nothing -> ""
+          Nothing -> "" -- No document so no text needed
           Just _  -> "Rendering slide "++show p++" of "++show n++"..."
         liftIO $ layoutSetAttributes layout [AttrForeground 0 (negate 1) white,
                                              AttrWeight 0 (negate 1) WeightBold,
                                              AttrSize 0 (negate 1) 24]
         liftIO $ drawLayout drawWindow gc 0 0 layout
         return ()
+      -- If we have already rendered the slide, then uncompress and draw the data
       Just (pixels, width', height', stride) -> do
         (width, height) <- liftIO $ drawableGetSize drawWindow
         liftIO $ BSU.unsafeUseAsCString
@@ -660,7 +675,12 @@ drawView state offset postDraw area = do
         return ()
     postDraw drawWindow gc area
 
+-- The following functions are postDraw functions to be passed to drawView
+
+-- No extra drawing to be done (used by preview views)
 postDrawNone _ _ _ = return ()
+
+-- Draw a border if the current slide is the shown slide (used by thumbnails)
 postDrawBorder p state drawWindow gc area = do
   p' <- liftIO $ liftM round $ pageAdjustment state `get` adjustmentValue
   when (p == p') $ liftIO $ do
@@ -668,6 +688,8 @@ postDrawBorder p state drawWindow gc area = do
     gcGetValues gc >>= \v -> gcSetValues gc (v { foreground = color, lineWidth = 6 })
     (width, height) <- drawableGetSize drawWindow
     drawRectangle drawWindow gc False 0 0 width height
+
+-- Draw a blank screen if video mute is enabled (used by audience view)
 postDrawVideoMute state drawWindow _gc _area = do
   videoMute' <- liftIO $ readIORef (videoMute state)
   case videoMute' of
