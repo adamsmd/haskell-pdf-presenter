@@ -23,23 +23,20 @@ import Graphics.UI.Gtk.Gdk.GC
 import Graphics.UI.Gtk.Poppler.Document
 import Graphics.UI.Gtk.Poppler.Page
 import Language.Haskell.TH (Exp(LitE), Lit(StringL), runIO)
+import Language.Haskell.TH.Syntax (addDependentFile)
 import System.Console.GetOpt
 import System.Directory (canonicalizePath)
 import System.Exit (exitSuccess, exitFailure)
 import System.FilePath (takeFileName)
 import System.Glib
 import System.Locale (defaultTimeLocale)
-
-guiData = $(liftM (LitE . StringL) (runIO $ readFile "presenter.glade"))
-
--- TODO: reset windows to default displays (or toggle if pressed again)
--- TODO: there was a bug where
+import Text.Printf
 
 data TimerState =
   Counting Integer{-starting microseconds-} Integer{-ending microseconds-} |
   Stopped Bool{-soft pause-} Integer{-elapsed microseconds-} Integer{-remaining microseconds-}
 data VideoMuteState = MuteOff | MuteBlack | MuteWhite deriving (Eq)
-data ClockState = RemainingTime | ElapsedTime | WallTime Bool{-True=24 hour mode-}
+data ClockState = RemainingTime | ElapsedTime | WallTime12 | WallTime24
 
 data State = State
  {
@@ -47,7 +44,7 @@ data State = State
    startTime :: IORef Integer{-microseconds-}
  , warningTime :: IORef Integer{-microseconds-}
  , endTime :: IORef Integer{-microseconds-}
- , documentURL :: IORef String -- TODO: Maybe
+ , documentURL :: IORef (Maybe String)
  , compression :: IORef Int
  , initialSlide :: IORef Int
 
@@ -70,39 +67,27 @@ data State = State
  , pageAdjustment :: Adjustment
 }
 
-setOption opt val = NoArg $ \state -> writeIORef (opt state) val
-argOption :: (State -> IORef a) -> String -> (String -> Maybe a) -> String -> ArgDescr (State -> IO ())
-argOption opt name f = ReqArg (\val state -> do
-  case f val of
-    Nothing -> putStrLn ("ERROR: Invalid argument to option \""++name++"\": "++show val) >>
-               putStr ("\n" ++ (usageInfo header options)) >> exitFailure
-    Just val' -> writeIORef (opt state) val')
-
-maybeRead :: (Read a) => String -> Maybe a
-maybeRead str | [(n, "")] <- reads str = Just n
-              | otherwise = Nothing
-
 header = "Usage: PdfViewer [OPTION...] file"
 options = [
-   Option "" ["start-time"] (argOption startTime "start-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Start time in minutes (default 10)"
+   Option "t" ["start-time"] (argOption startTime "start-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Start time in minutes (default 10)"
  , Option "w" ["warning-time"] (argOption warningTime "warning-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Warning time in minutes (default 5)"
- , Option "w" ["end-time"] (argOption endTime "end-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "End time in minutes (default 0)"
+ , Option "" ["end-time"] (argOption endTime "end-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "End time in minutes (default 0)"
  , Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
  , Option "f" ["fullscreen"] (setOption fullscreen True) "Full screen on startup (default off)"
  , Option "" ["mute-black"] (setOption videoMute MuteBlack) "Start with mute to black"
  , Option "" ["mute-white"] (setOption videoMute MuteBlack) "Start with mute to white"
  , Option "" ["mute-off"] (setOption videoMute MuteBlack) "Start with no muting (default)"
+ , Option "" ["slide"] (argOption initialSlide "slide" (maybeRead) "INT") "Initial slide (default 1)"
+ , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> \x -> if 0 <= x && x <= 9 then Just x else Nothing) "[0-9]") "Compression level. 0 is None. 1 is fastest. 9 is best. (Default is 1.)"
+ ]
+
 {- TODO:
  , Option "" ["timer=paused"] (setOption timer (Paused (error "internal error: paused"))) "Start with timer paused (default)"
  , Option "" ["timer=running"] (setOption timer (Stopped (error "internal error: paused"))) "Start with timer running"
  , Option "" ["timer=stopped"] (setOption timer (Counting (error "internal error: paused"))) "Start with timer stopped"
--}
--- overtime, warning, and normal colors
+-- colors for overtime, warning, and normal
 -- metadata font size
 -- swap screens
--- show clock
--- show elapsed time
--- show remaining time
 -- start record
 -- note mode
 -- +prerender size (zero means no bound)
@@ -111,26 +96,60 @@ options = [
 -- +columns in preview
 -- +adjustable overtime
 -- timer stopped or playing (instead of paused) (what does this do for timer reset?)
- , Option "" ["slide"] (argOption initialSlide "slide" (maybeRead) "INT") "Initial slide (default 1)"
- , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> \x -> if 0 <= x && x <= 9 then Just x else Nothing) "[0-9]") "Compression level. 0 is None. 1 is fastest. 9 is best. (Default is 1.)"
 -- stretch vs scale
 -- ++, Option "" ["anti-screensaver"] "always", "never", "fullscreen-only" (default = fullscreen only)
- ]
 -- TODO: on full screen, pull windows to front
 -- TODO: option parsing (e.g. read shouldn't exit the program when can't parse)
 -- TODO: when repaint window, need to repaint all windows (store list of windows in State)
+-- TODO: reset windows to default displays (or toggle if pressed again)
+-}
+
+----------------
+-- Utils and constants
+----------------
+
+-- TODO: document
+
+setOption opt val = NoArg $ \state -> writeIORef (opt state) val
+argOption :: (State -> IORef a) -> String -> (String -> Maybe a) -> String -> ArgDescr (State -> IO ())
+argOption opt name f = ReqArg (\val state -> do
+  case f val of
+    Nothing -> putStrLn ("ERROR: Invalid argument to option \""++name++"\": "++show val) >>
+               putStr ("\n" ++ (usageInfo header options)) >> exitFailure
+    Just val' -> writeIORef (opt state) val')
+
+red = Color 0xffff 0x0000 0x0000
+purple = Color 0x8888 0x3333 0xffff
+white = Color 0xffff 0xffff 0xffff
+black = Color 0x0000 0x0000 0x0000
+
+maybeRead :: (Read a) => String -> Maybe a
+maybeRead str | [(n, "")] <- reads str = Just n
+              | otherwise = Nothing
+
+mainWindows state = -- NOTE: Order of windows effects which window is on top in fullscreen
+  mapM (builderGetObject (builder state) castToWindow) ["presenterWindow", "audienceWindow"]
+
+-- TODO: cleanup
+heightFromWidth w = w * 3 `div` 4
+numColumns = 4
+textSize = 60
+
+----------------
+-- Main Program
+----------------
 
 main :: IO ()
 main = do
   -- Get program arguments.
   args <- initGUI
 
-  -- Shared state
+  -- Initialize shared state
   state <- return State
     `ap` newIORef (10 * 60 * 1000 * 1000) {-startTime-}
     `ap` newIORef (5 * 60 * 1000 * 1000) {-warningTime-}
     `ap` newIORef (0) {-20 * 60 * 1000 * 1000-} {-endTime-}
-    `ap` newIORef "" {-file uri-}
+    `ap` newIORef Nothing {-file uri-}
     `ap` newIORef 1 {-compression-}
     `ap` newIORef 1 {-initial slide-}
 
@@ -148,16 +167,22 @@ main = do
     `ap` newIORef Map.empty {-pages-}
     `ap` adjustmentNew 0 0 0 1 10 1 {-pageAdjustment-}
 
+  -- Parse command line options and call guiMain
   case getOpt Permute options args of
     (opts, [], []) -> mapM_ ($ state) opts >> guiMain state
-    (opts, [file], []) -> mapM_ ($ state) opts >> postGUIAsync (canonicalizePath file >>= \file' -> openDoc state ("file://"++file') >> return ()) >> guiMain state
+    (opts, [file], []) -> do
+      mapM_ ($ state) opts
+      file' <- canonicalizePath file
+      postGUIAsync (openDoc state (Just $ "file://"++file') >> return ())
+      guiMain state
     (_, [_,_], []) -> putStrLn ("Error: Multiple files on command line") >> putStr (usageInfo header options)
-    (_, _, errors) -> putStr (unlines errors) >> putStr (usageInfo header options)
+    (_, _, errors) -> putStrLn (concat errors) >> putStr (usageInfo header options)
 
 guiMain :: State -> IO ()
 guiMain state = do
   -- Load and setup the GUI
-  builderAddFromString (builder state) guiData
+  builderAddFromString (builder state)
+    $(let f = "presenter.glade" in addDependentFile f >> liftM (LitE . StringL) (runIO $ readFile f))
 
   -- Finish setting up the state and configure gui to match state
   pageAdjustment state `set` [adjustmentUpper :=> liftM fromIntegral (readIORef (initialSlide state)),
@@ -186,16 +211,16 @@ guiMain state = do
      layout `onSizeAllocate` (\(Graphics.UI.Gtk.Rectangle _ _ newWidth _) -> do
        oldWidth' <- readIORef oldWidth
        writeIORef oldWidth newWidth
-       when (oldWidth' /= newWidth) $ recomputeViews state newWidth)
-     pageAdjustment state `onAdjChanged` (readIORef oldWidth >>= recomputeViews state)
-     --onZoom $ recocmputeViews
+       when (oldWidth' /= newWidth) $ recomputeThumbnails state newWidth)
+     pageAdjustment state `onAdjChanged` (readIORef oldWidth >>= recomputeThumbnails state)
+     --onZoom $ recocmputeViews -- TODO: why was this here?
 
-     -- Scroll to keep the current slide visible
+     -- Set a handler that scrolls to keep the current slide visible
      adjustment <- scrolledWindowGetVAdjustment =<<
                    builderGetObject (builder state) castToScrolledWindow "thumbnails.scrolled"
      let update = do p <- liftM round $ pageAdjustment state `get` adjustmentValue
-                     let row = (p-1) `div` columns
-                     height <- liftM (heightFromWidth . (`div` columns)) $ readIORef oldWidth
+                     let row = (p-1) `div` numColumns
+                     height <- liftM (heightFromWidth . (`div` numColumns)) $ readIORef oldWidth
                      adjustmentClampPage adjustment (fromIntegral $ row*height) (fromIntegral $ row*height+height)
      pageAdjustment state `onValueChanged` update
      pageAdjustment state `onAdjChanged` update
@@ -220,16 +245,19 @@ guiMain state = do
                      l <- liftM round $ pageAdjustment state `get` adjustmentLower
                      when (l /= 0) $ slideNum `set` [
                        labelText := show (p :: Integer) ++ "/" ++ show (n :: Integer),
-                       labelAttributes := [AttrSize 0 (negate 1) 60, -- TODO: we have to do this to get the right font???
+                       labelAttributes := [AttrSize 0 (negate 1) textSize, -- TODO: we have to do this to get the right font???
                                            AttrForeground 0 (negate 1) white]]
      pageAdjustment state `onValueChanged` update
      pageAdjustment state `onAdjChanged` update
 
   -- Setup the top-level windows
   do let setupWindow window = do
+           -- Make the window fullscreen if needed
            f <- readIORef (fullscreen state)
            when f $ windowFullscreen window
+           -- Make background black
            widgetModifyBg window StateNormal (Color 0 0 0)
+           -- Add event handlers
            window `onDestroy` mainQuit
            window `on` keyPressEvent $ do
              mods <- eventModifier
@@ -237,9 +265,11 @@ guiMain state = do
              b <- liftIO $ handleKey state mods (map toLower name)
              liftIO $ mapM_ widgetQueueDraw =<< mainWindows state
              return b
-           -- | Overkill but most of the window has to be redrawn anyway
+           -- Redraw the window when we switch slides.  Most (though not all)
+           -- of it needs to be redrawn so we redraw the entire window.
            pageAdjustment state `onValueChanged` widgetQueueDraw window
            pageAdjustment state `onAdjChanged` widgetQueueDraw window
+           -- Show the window
            widgetShowAll window
      mapM_ setupWindow =<< mainWindows state
 
@@ -259,12 +289,15 @@ guiMain state = do
         when (n > 1) $ do Rectangle x y _ _ <- screenGetMonitorGeometry screen 1
                           windowMove w x y
 
-     -- Make sure the screen saver doesn't start by moving the cursor
-     -- Since we move the mouse by zero pixels, this shouldn't effect the user
+     -- Make sure the screen saver doesn't start by moving the cursor.
+     -- Since we move the mouse by zero pixels, this shouldn't effect the user.
+     -- Also set up the handler for hiding the mouse after a delay.
      do blankCursor <- cursorNew BlankCursor
-        timeoutAdd (do display <- screenGetDisplay =<< windowGetScreen w
+        timeoutAdd (do -- Move the cursor by zero pixels
+                       display <- screenGetDisplay =<< windowGetScreen w
                        (screen, _, x, y) <- displayGetPointer display
                        displayWarpPointer display screen x y
+                       -- Hide the mouse if needed.
                        mouseTimeout' <- readIORef (mouseTimeout state)
                        currTime <- getMicroseconds
                        fullscreen' <- readIORef (fullscreen state)
@@ -276,6 +309,7 @@ guiMain state = do
         let update = do dw `drawWindowSetCursor` Nothing
                         writeIORef (mouseTimeout state) =<< liftM (+ 3 * 1000 * 1000) getMicroseconds
         w `on` enterNotifyEvent $ liftIO update >> return False
+        -- Reset the timeout if the user moves the mouse
         w `on` motionNotifyEvent $ do
           coord <- eventRootCoordinates
           oldCoord <- liftIO $ readIORef oldCoordRef
@@ -284,52 +318,54 @@ guiMain state = do
           return False
 
   -- Schedule rendering, and start main loop
-  renderThreadSoon state
+  startRenderThread state =<< builderGetObject (builder state) castToProgressBar "renderingProgressbar"
   mainGUI
 
--- Recompute when the view size changes
-recomputeViews state newWidth = do
+-- Recompute thumbnails when sizes need to change
+recomputeThumbnails state newWidth = do
   layout <- builderGetObject (builder state) castToLayout "thumbnails.layout"
+  -- Remove the old thumbnails
   containerForeach layout (containerRemove layout)
+  -- Figure out how big the thumbnails and thumbnail panel should be
   numPages <- pageAdjustment state `get` adjustmentUpper
-  let width = newWidth `div` columns
+  let width = newWidth `div` numColumns
       height = heightFromWidth width
-      numRows = round numPages `div` columns + 1
+      numRows = round numPages `div` numColumns + 1
   layoutSetSize layout newWidth (height*numRows)
+  -- Add thumbnails for the new sizes
   sequence_ [ do
-    let page = columns*row+col+1
+    let page = numColumns*row+col+1
     view <- makeView state (const page) (postDrawBorder page state)
     widgetSetSizeRequest view width height
     layoutPut layout view (col*width) (row*height)
     view `widgetAddEvents` [ButtonPressMask, ButtonReleaseMask]
     view `on` buttonReleaseEvent $ tryEvent $ liftIO $ gotoPage state (const page)
     --view `set` [widgetTooltipText := Just ("Slide " ++ show page)] -- TODO: this triggers a bug where window drawing does not update
-    | row <- [0..numRows-1], col <- [0..3]]
+    | row <- [0..numRows-1], col <- [0..numColumns-1]]
   widgetShowAll layout
 
-gotoPage :: State -> (Int -> Int) -> IO ()
+-- Apply "f" to the current page number
 gotoPage state f = do
   oldPage <- liftM round $ pageAdjustment state `get` adjustmentValue
   pageAdjustment state `set` [adjustmentValue := fromIntegral (f oldPage)]
   newPage <- liftM round $ pageAdjustment state `get` adjustmentValue
+  -- Update the history if needed
   when (oldPage /= newPage) $ do
     (back, _) <- readIORef (history state)
     writeIORef (history state) (oldPage : back, [])
-
-mainWindows state = -- NOTE: Order of windows effects which window is on top in fullscreen
-  mapM (builderGetObject (builder state) castToWindow) ["presenterWindow", "audienceWindow"]
-
--- TODO: cleanup
-heightFromWidth w = w * 3 `div` 4
-columns = 4
 
 ------------------------
 -- User Event handling
 ------------------------
 
+-- TODO: document
+
 -- TODO: left and right mouse click for forward and backward
+-- TODO: help dialog: Shift-right = forward by 10, etc.
+-- TODO: help dialog: Alt-left = history back, etc.
+-- TODO: help dialog: shift-p = stop
 handleKey :: State -> [Modifier] -> String -> IO Bool
-handleKey state [Graphics.UI.Gtk.Control] "q" = mainQuit >> return True
+handleKey state [Control] "q" = mainQuit >> return True
 handleKey state _ "h" = builderGetObject (builder state) castToAboutDialog "aboutDialog" >>= widgetShowAll >> return True
 handleKey state _ "question" = builderGetObject (builder state) castToAboutDialog "aboutDialog" >>= widgetShowAll >> return True
 handleKey state [] key | key `elem` ["left", "up", "page_up", "backspace"] =
@@ -346,10 +382,10 @@ handleKey state [] "end" =
 handleKey state [] "tab" =
   builderGetObject (builder state) castToNotebook "presenter.notebook" >>=
     (`set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)]) >> return True
-handleKey state [Graphics.UI.Gtk.Control] "r" = readIORef (documentURL state) >>= openDoc state >> return True
+handleKey state [Control] "r" = readIORef (documentURL state) >>= openDoc state >> return True
 handleKey state [] "p" = modifyTimerState state togglePauseTimer >> return True
-handleKey state [Control] "p" = modifyTimerState state toggleStopTimer >> return True
 handleKey state [Shift] "p" = modifyTimerState state toggleStopTimer >> return True
+handleKey state [Control] "p" = modifyTimerState state toggleStopTimer >> return True
 handleKey state [] "pause" = modifyTimerState state togglePauseTimer >> return True
 handleKey state [] "bracketleft" =
   builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ max 0 . (+(negate 20))]) >> return True
@@ -367,22 +403,27 @@ handleKey state [] "f" = toggleFullScreen state >> return True
 handleKey state [] "f11" = toggleFullScreen state >> return True
 handleKey state [Alt] "return" = toggleFullScreen state >> return True
 handleKey state [Control] "l" = toggleFullScreen state >> return True
-handleKey state [] "t" = modifyTimerState state (const $ liftM (Stopped True 0) (readIORef (startTime state))) >> return True
- -- ^ TODO: reset to what was set on cmd line?
-handleKey state [Graphics.UI.Gtk.Control] "t" = timerDialog state >> return True
-handleKey state [Graphics.UI.Gtk.Control] "g" = gotoSlideDialog state >> return True
-handleKey state [Graphics.UI.Gtk.Control] "o" = openFileDialog state >> return True
+handleKey state [Control] "g" = gotoSlideDialog state >> return True
+handleKey state [Control] "o" = openFileDialog state >> return True
 handleKey state [Alt] "left" = historyBack state >> return True
 handleKey state [] "xf86back" = historyBack state >> return True
 handleKey state [Alt] "right" = historyForward state >> return True
 handleKey state [] "xf86forward" = historyForward state >> return True
 handleKey state [] "c" = modifyClockState state (\c -> case c of
                               RemainingTime -> ElapsedTime
-                              ElapsedTime -> WallTime False
-                              WallTime False -> WallTime True
-                              WallTime True -> RemainingTime) >> return True
-handleKey state mods name = (putStrLn $ "KeyEvent:"++show mods ++ name) >> return False
+                              ElapsedTime -> WallTime12
+                              WallTime12 -> WallTime24
+                              WallTime24 -> RemainingTime) >> return True
+handleKey state [Shift] "c" = modifyTimerState state (const $ liftM (Stopped True 0) (readIORef (startTime state))) >> return True
+ -- ^ TODO: reset to what was set on cmd line?
+handleKey state [Control] "c" = timerDialog state >> return True
+handleKey _ _ name | name `elem` [ -- Ignore modifier keys
+  "shift_l", "shift_r", "control_l", "control_r", "alt_l", "alt_r",
+  "super_l", "super_r", "caps_lock", "menu", "xf86wakeup"]
+  = return True
+handleKey state mods name = (putStrLn $ "Unknown key \""++name++"\" with mods "++show mods) >> return False
 
+-- Move back one slide in the history
 historyBack state = do
   (back, forward) <- readIORef (history state)
   currPage <- liftM round $ pageAdjustment state `get` adjustmentValue
@@ -391,6 +432,7 @@ historyBack state = do
     prevPage : back -> do pageAdjustment state `set` [adjustmentValue := fromIntegral prevPage]
                           writeIORef (history state) (back, currPage : forward)
 
+-- Move forward one slide in the history
 historyForward state = do
   (back, forward) <- readIORef (history state)
   currPage <- liftM round $ pageAdjustment state `get` adjustmentValue
@@ -399,34 +441,53 @@ historyForward state = do
     nextPage : forward -> do pageAdjustment state `set` [adjustmentValue := fromIntegral nextPage]
                              writeIORef (history state) (currPage : back, forward)
 
+-- Toggle whether we are in fullscreen mode
 toggleFullScreen state = do
   f <- readIORef (fullscreen state)
   mapM_ (if f then windowUnfullscreen else windowFullscreen) =<< mainWindows state
   -- TODO: mixed fullscreen?
   writeIORef (fullscreen state) $ not f
 
--- full left, fit right, 1/3, centered, 2/3, fit left, full right
+-- Move the divider on the preview window to the next logical division point.
+-- These points are:
+--   - All the way to the left
+--   - Perfectly fit the right preview
+--   - 1/3 of the way from the left
+--   - Centered
+--   - 1/3 of the way from the right
+--   - Perfectly fit the left preview
+--   - All the way to the right
 panedStops state = do
+  -- Get the current position and size of the divider
   paned <- builderGetObject (builder state) castToPaned "preview.paned"
   maxPos <- liftM fromIntegral $ paned `get` panedMaxPosition
   oldPos <- liftM fromIntegral $ paned `get` panedPosition
   (_, panedHeight) <- widgetGetSize paned
+  -- Get the page number of the current and last pages
   p <- liftM round $ pageAdjustment state `get` adjustmentValue
   pLast <- liftM round $ pageAdjustment state `get` adjustmentUpper
+  -- Compute where do divide to get perfect fits and store them in "stops"
   document <- readIORef (document state)
   stops <- case document of
-    Nothing -> return []
+    Nothing -> return [] -- If there is no document, then there are no stops
     Just document -> do
       (pageWidth1, pageHeight1) <- pageGetSize =<< documentGetPage document (p - 1)
       (pageWidth2, pageHeight2) <- pageGetSize =<< documentGetPage document (p `min` pLast - 1)
       return [round (fromIntegral panedHeight * pageWidth1 / pageHeight1),
               maxPos - round (fromIntegral panedHeight * pageWidth2 / pageHeight2)]
+  -- Store the other divisions in stops'
   let stops' = [maxPos `div` 3, maxPos `div` 2, maxPos * 2 `div` 3, maxPos]
+  -- Move to the next stop greater than the current stop.
   paned `set` [panedPosition := case sort $ filter (> oldPos) $ stops ++ stops' of
-                                  [] -> 0
+                                  [] -> 0 -- If no more stops, go fully left
                                   (x:_) -> x]
 
+----------------
+-- Dialogs
+----------------
+
 timerDialog state = do
+  -- Get dialog and text fields from GUI builder
   dialog <- builderGetObject (builder state) castToDialog "timerDialog"
   [remainingTimeEntry, elapsedTimeEntry, startTimeEntry, warningTimeEntry, endTimeEntry] <-
     mapM (builderGetObject (builder state) castToEntry)
@@ -437,9 +498,10 @@ timerDialog state = do
     mapM (builderGetObject (builder state) castToRadioButton)
     ["remainingTimeRadio", "elapsedTimeRadio", "12HourClockRadio", "24HourClockRadio"]
 
+  -- Populate the GUI elements based on the state
   clock' <- readIORef (clock state)
   (case clock' of RemainingTime -> remainingTimeRadio; ElapsedTime -> elapsedTimeRadio;
-                  WallTime False -> h12ClockRadio; WallTime True -> h24ClockRadio) `set` [toggleButtonActive := True]
+                  WallTime12 -> h12ClockRadio; WallTime24 -> h24ClockRadio) `set` [toggleButtonActive := True]
 
   timer' <- readIORef (timer state)
   (case timer' of Stopped False _ _ -> stopped; Stopped True _ _ -> paused;
@@ -455,10 +517,13 @@ timerDialog state = do
   warningTimeEntry `set` [entryText :=> liftM formatTime (readIORef (warningTime state))]
   endTimeEntry `set` [entryText :=> liftM formatTime (readIORef (endTime state))]
 
+  -- Set the default keyboard focus and display the dialog
   widgetGrabFocus remainingTimeEntry
-  loopDialog dialog $ do
+  loopDialog dialog $ do -- NOTE: The "do" block runs when the user clicks "Okay"
+    -- Get the values of the test fields
     [remainingTime'', elapsedTime'', startTime'', warningTime'', endTime''] <-
         mapM (`get` entryText) [remainingTimeEntry, elapsedTimeEntry, startTimeEntry, warningTimeEntry, endTimeEntry]
+    -- Parse the time fields and report errors if needed
     case (parseTime remainingTime'', parseTime elapsedTime'', parseTime startTime'',
           parseTime warningTime'', parseTime endTime'') of
       (Nothing, _, _, _, _) -> errorDialog ("Error parsing remaining time: "++remainingTime'') >> return False
@@ -467,48 +532,67 @@ timerDialog state = do
       (_, _, _, Nothing, _) -> errorDialog ("Error parsing warning time: "++warningTime'') >> return False
       (_, _, _, _, Nothing) -> errorDialog ("Error parsing end time: "++warningTime'') >> return False
       (Just remain, Just elapsed, Just start, Just warn, Just end) -> do
+        -- Save the parsed time value to the state
         writeIORef (startTime state) start
         writeIORef (warningTime state) warn
         writeIORef (endTime state) end
+        -- Set the timer state based the selected radio button
         do [r,p,s] <- mapM (`get` toggleButtonActive) [running, paused, stopped]
            when r $ modifyTimerState state (const $ return $ Stopped True elapsed remain) >>
                     modifyTimerState state startTimer
            when p $ modifyTimerState state (const $ return $ Stopped True elapsed remain)
            when s $ modifyTimerState state (const $ return $ Stopped False elapsed remain)
+        -- Set the clock mode based on the selected radio button
         do [r,e,h12,h24] <- mapM (`get` toggleButtonActive) [
                              remainingTimeRadio, elapsedTimeRadio, h12ClockRadio, h24ClockRadio]
            modifyClockState state (const $ if r then RemainingTime 
                                       else if e then ElapsedTime
-                                      else if h12 then WallTime False
-                                      else if h24 then WallTime True
+                                      else if h12 then WallTime12
+                                      else if h24 then WallTime24
                                       else error "INTERNAL ERROR: No clock radio active")
         return True
+  -- Close the dialog
   widgetHide dialog
 
 gotoSlideDialog state = do
+  -- Get dialog and text fields from GUI builder
   dialog <- builderGetObject (builder state) castToDialog "pageDialog"
   entry <- builderGetObject (builder state) castToSpinButton "pageDialogSpinButton"
   adjustment <- builderGetObject (builder state) castToAdjustment "pageDialogAdjustment"
   label <- builderGetObject (builder state) castToLabel "pageDialogLabel"
+
+  -- Set the dialog spinner and label to correspond to the current and max page number of the document
   pageNum <- pageAdjustment state `get` adjustmentValue
   pageMax <- pageAdjustment state `get` adjustmentUpper
   adjustment `set` [adjustmentValue := pageNum, adjustmentUpper := pageMax]
   label `set` [labelText := "Go to slide (1-" ++ show (round pageMax :: Integer) ++ "):"]
+
+  -- Show the dialog
   widgetShowAll dialog
   widgetGrabFocus entry
   r <- dialogRun dialog
+
+  -- When the dialog closes, get the spinner value and set the current page
   value <- entry `get` spinButtonValue
   when (r == ResponseOk) $ gotoPage state (const (round value))
   widgetHide dialog
 
+-- Open and run a modal file selection dialog and set load the PDF document that is selected.
 openFileDialog state = do
   dialog <- fileChooserDialogNew Nothing Nothing FileChooserActionOpen
             [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
-  fileChooserSetURI dialog =<< readIORef (documentURL state)
-  loopDialog dialog (openDoc state . head =<< fileChooserGetURIs dialog)
+  maybe (return True) (fileChooserSetURI dialog) =<< readIORef (documentURL state)
+  loopDialog dialog (openDoc state . Just . head =<< fileChooserGetURIs dialog)
   widgetDestroy dialog
   return True
 
+-- Open and run a modal error dialog with a textual message.
+errorDialog msg = do
+  dialog <- messageDialogNew Nothing [DialogModal, DialogDestroyWithParent] MessageError ButtonsClose msg
+  dialogRun dialog
+  widgetDestroy dialog
+
+-- Keep running a dialog until the user clicks "Okay" and "m" returns "True"
 loopDialog d m = do
   r <- dialogRun d
   when (r == ResponseOk) $ do
@@ -518,6 +602,19 @@ loopDialog d m = do
 ------------------------
 -- Views
 ------------------------
+
+-- TODO: document
+
+modifyVideoMute state f = do
+  mute <- f =<< readIORef (videoMute state)
+  builderGetObject (builder state) castToLabel "videoMuteStatusLabel" >>= (`set` case mute of
+    MuteOff -> [labelText := "\x2600",
+                labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) black]]
+    MuteWhite -> [labelText := "\x2600",
+                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
+    MuteBlack -> [labelText := "\x263C",
+                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]])
+  writeIORef (videoMute state) mute
 
 makeView :: State -> (Int -> Int) -> (DrawWindow -> GC -> DrawingArea -> EventM EExpose ()) -> IO DrawingArea
 makeView state offset postDraw = do
@@ -580,9 +677,13 @@ postDrawVideoMute state drawWindow _gc _area = do
     --MuteFreeze n -> drawView state (const n) postDrawNone area
 
 ------------------------
--- State modification and rendering functions
+-- Clock/timer rendering and control
 ------------------------
 
+-- Set the clock mode (e.g., 12 vs 24 hour)
+modifyClockState state f = modifyIORef (clock state) f >> displayTime state
+
+-- Functions that are used as parameter to modifyTimerState
 startTimer (Counting start end) = return (Counting start end)
 startTimer (Stopped _ elapsed remaining) = getMicroseconds >>= \t -> return (Counting (t-elapsed) (t+remaining))
 
@@ -601,96 +702,71 @@ togglePauseTimer t = pauseTimer t
 toggleStopTimer t@(Stopped False _ _) = startTimer t
 toggleStopTimer t = stopTimer t
 
-getMicroseconds :: IO Integer
-getMicroseconds = do
-  GTimeVal { gTimeValSec = sec, gTimeValUSec = usec } <- gGetCurrentTime
-  return (fromIntegral sec * 1000 * 1000 + fromIntegral usec)
+-- Modifies the current timer state. "f" should be one of 'startTimer', etc.
+modifyTimerState state f = do
+  timerState <- f =<< readIORef (timer state)
+  builderGetObject (builder state) castToLabel "timerStatusLabel" >>= (`set` case timerState of
+    Stopped True _ _ -> [labelText := "\x25AE\x25AE", -- U+25AE = One bar of pause icon
+                 labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
+    Stopped False _ _ -> [labelText := "\x25A0", -- U+25A0 = Stop
+                 labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
+    Counting _ _ -> [labelText := "\x25B6", -- U+25B6 = Play
+                   labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) black]])
+  writeIORef (timer state) timerState
 
+-- Render the clock/timer
 displayTime state = do
+  -- Compute foreground and background colors based on timer status and times
   timer' <- readIORef (timer state)
-  case timer' of Stopped _ elapsed remaining -> displayTime' state elapsed remaining
-                 Counting start end -> getMicroseconds >>= \t -> displayTime' state (t-start) (end-t)
-displayTime' state elapsed remaining = do
+  (elapsed, remaining) <- case timer' of
+    Stopped _ elapsed remaining -> return (elapsed, remaining)
+    Counting start end -> getMicroseconds >>= \t -> return (t - start, end - t)
   warningTime' <- readIORef (warningTime state)
   endTime' <- readIORef (endTime state)
   let (fg_color, bg_color) | remaining < endTime' = (white, red)
                            | remaining < warningTime' = (white, purple)
                            | otherwise = (white, black)
+
+  -- Get time string based on clock mode
   clockMode <- readIORef (clock state)
   let clockStr = case clockMode of 
-        RemainingTime -> " \x231B"
-        ElapsedTime -> " \x231A"
-        WallTime False -> ""
-        WallTime True -> ""
+        RemainingTime -> " \x231B" -- U+231B = Hour glass
+        ElapsedTime -> " \x231A" -- U+231A = Wall clock
+        WallTime12 -> ""
+        WallTime24 -> " (24H)"
   time <- case clockMode of
             RemainingTime -> return (formatTime remaining)
             ElapsedTime -> return (formatTime elapsed)
-            WallTime hourMode -> do
-              tz <- getCurrentTimeZone
-              utc <- getCurrentTime
-              return $ Data.Time.Format.formatTime defaultTimeLocale
-                         (if hourMode then "%H:%M" else "%I:%M %p") (utcToLocalTime tz utc)
+            WallTime12 -> getTime "%I:%M %p"
+            WallTime24 -> getTime "%H:%M"
+
+  -- Function for setting the text of a label at a given size
+  let setLabel attrSize size label = label `set` [
+        labelText := time++clockStr,
+        labelAttributes := [attrSize 0 (length time) size, -- The first text is at full size
+                            attrSize (length time) (negate 1) (size / 2), -- The second test is at half size
+                            AttrForeground 0 (negate 1) fg_color,
+                            AttrBackground 0 (negate 1) bg_color]]
+
   -- Set the hidden label so we maintain a minimum size
-  do hiddenLabel <- builderGetObject (builder state) castToLabel "hiddenTimeLabel"
-     hiddenLabel `set` [labelText := time++clockStr,
-                        labelAttributes := [AttrSize 0 (length time) 60, --(fromIntegral minHeight),
-                                            AttrSize (length time) (negate 1) 30,
-                                            AttrForeground 0 (negate 1) fg_color,
-                                            AttrBackground 0 (negate 1) bg_color]]
+  setLabel AttrSize textSize =<< builderGetObject (builder state) castToLabel "hiddenTimeLabel"
   -- TODO: Why is AttrSize a different font than what the GUI builder makes?
 
   -- Initially set the size based on height
   label <- builderGetObject (builder state) castToLabel "timeLabel"
   (w, h) <- widgetGetSize label
-  label `set` [labelText := time++clockStr,
-               labelAttributes := [AttrAbsSize 0 (length time) (fromIntegral h),
-                                   AttrAbsSize (length time) (negate 1) (fromIntegral h / 2),
-                                   AttrForeground 0 (negate 1) fg_color,
-                                   AttrBackground 0 (negate 1) bg_color]]
+  setLabel AttrAbsSize (fromIntegral h) label
 
   -- Then rescale the text to ensure it is not too wide
   (_, PangoRectangle _ _ iw _) <- layoutGetExtents =<< labelGetLayout label
-  let h' = h `min` (w * h `div` round iw)
-  label `set` [labelText := time++clockStr,
-               labelAttributes := [AttrAbsSize 0 (length time) (fromIntegral h'),
-                                   AttrAbsSize (length time) (negate 1) (fromIntegral h' / 2),
-                                   AttrForeground 0 (negate 1) fg_color,
-                                   AttrBackground 0 (negate 1) bg_color]]
-
-red = Color 0xffff 0x0000 0x0000
-purple = Color 0x8888 0x3333 0xffff
-white = Color 0xffff 0xffff 0xffff
-black = Color 0x0000 0x0000 0x0000
-
-modifyVideoMute state f = do
-  mute <- f =<< readIORef (videoMute state)
-  builderGetObject (builder state) castToLabel "videoMuteStatusLabel" >>= (`set` case mute of
-    MuteOff -> [labelText := "\x2600",
-                labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) black]]
-    MuteWhite -> [labelText := "\x2600",
-                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
-    MuteBlack -> [labelText := "\x263C",
-                  labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]])
-  writeIORef (videoMute state) mute
-
-modifyTimerState state f = do
-  timerState <- f =<< readIORef (timer state)
-  builderGetObject (builder state) castToLabel "timerStatusLabel" >>= (`set` case timerState of
-    Stopped True _ _ -> [labelText := "\x25AE\x25AE",
-                 labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
-    Stopped False _ _ -> [labelText := "\x25A0",
-                 labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) white]]
-    Counting _ _ -> [labelText := "\x25B6",
-                   labelAttributes := [AttrSize 0 (negate 1) 30, AttrForeground 0 (negate 1) black]])
-  writeIORef (timer state) timerState
-
-modifyClockState state f = modifyIORef (clock state) f >> displayTime state
+  setLabel AttrAbsSize (fromIntegral (h `min` (h * w `div` round iw))) label
 
 ------------------------
 -- Time formatting
 ------------------------
 
--- TODO: ugh, I'd really prefer to use standard code for this, but I couldn't find any
+-- Parse time entered by the user.  Format: -?[0-9]*:[0-9]*:[0-9]*
+-- TODO: I'd really prefer to use standard code for this, but I couldn't find any
 parseTime :: String -> Maybe Integer{-microseconds-}
 parseTime ('-' : str) = liftM negate (parseTime str)
 parseTime str = time where
@@ -699,82 +775,101 @@ parseTime str = time where
        | otherwise = Nothing
   (sec : min : hr : _) = reverse (splitOn ":" str) ++ repeat "0"
 
+-- Format time for display to user.  Format: H:MM:SS or -H:MM:SS
 formatTime :: Integer -> String
-formatTime microseconds =
-  (if microseconds < 0 then "-" else "") ++
-  show hours ++ ":" ++ pad minutes ++ ":" ++ pad seconds {-++ "." ++ show tenths-} where
-    ((((hours, minutes), seconds), _tenths), _) = id // 60 // 60 // 10 // (100*1000) $ abs microseconds
-    (//) f base val = (f q, r) where (q, r) = val `quotRem` base
-    pad x = case show x of
-      [c]     -> ['0', c]
-      ['-',c] -> ['-', '0', c]
-      cs       -> cs
+formatTime microseconds = printf "%d:%02d:%02d" hours (abs minutes) (abs seconds) where
+  ((((hours, minutes), seconds), _tenths), _) = id // 60 // 60 // 10 // (100*1000) $ microseconds
+  (//) f base val = (f q, r) where (q, r) = val `quotRem` base
+
+-- Return current time in microseconds
+getMicroseconds :: IO Integer
+getMicroseconds = do
+  GTimeVal { gTimeValSec = sec, gTimeValUSec = usec } <- gGetCurrentTime
+  return (fromIntegral sec * 1000 * 1000 + fromIntegral usec)
+
+-- Return the time of day according to "format"
+getTime format = do
+  tz <- getCurrentTimeZone
+  utc <- getCurrentTime
+  return $ Data.Time.Format.formatTime defaultTimeLocale format (utcToLocalTime tz utc)
 
 ------------------------
--- Render thread
+-- Loading and Rendering the PDF document
 ------------------------
+
+-- Load a new PDF document
+openDoc _ Nothing = errorDialog "Cannot open file: No file selected" >> return False
+openDoc state (Just uri) = do
+  doc <- catchGError (documentNewFromFile uri Nothing)
+           (\x -> errorDialog ("Error opening \"" ++ uri ++ "\": " ++ show x) >> return Nothing)
+  case doc of
+    Nothing -> return False -- Document failed to load
+    Just doc -> do
+      -- Use the document title or filename as the window title
+      title <- doc `get` documentTitle
+      windowListToplevels >>=
+        mapM_ (`windowSetTitle` ((if null title then takeFileName uri else title) ++ " - PDF Presenter"))
+      -- Ensure that the current page number is in bounds for the new document
+      -- NOTE: we increment the current page number by 0 to trigger the range clamping on pageAdjustment
+      pageAdjustment state `set` [
+        adjustmentLower := 1, adjustmentUpper :=> liftM fromIntegral (documentGetNPages doc), adjustmentValue :~ (+0)]
+      -- Save the new state and return
+      writeIORef (pages state) Map.empty
+      writeIORef (documentURL state) (Just uri)
+      writeIORef (document state) (Just doc)
+      return True
 
 -- We render in a timeout to keep the GUI responsive.  We move to a
 -- slower timeout when everything is already rendered to avoid hogging
 -- the CPU.  We avoid using a separate thread because that would
 -- require using postGUISync which causes delays that slow down the
 -- rendering.
-renderThreadSoon state = timeoutAdd (renderThread' state >> return False) 1{-milliseconds-} >> return ()
-renderThreadNotSoon state = timeoutAdd (renderThread' state >> return False) 100{-milliseconds-} >> return ()
-renderThread' state = do
-  doc <- readIORef (document state)
-  case doc of
-    Nothing -> renderThreadNotSoon state
-    Just doc -> do
-      numPages <- liftM round $ pageAdjustment state `get` adjustmentUpper
-      currPage <- liftM round $ pageAdjustment state `get` adjustmentValue
-      views <- liftM (nub . Map.elems) $ readIORef (views state) -- Sizes of the views
-      cache <- liftM (Map.filterWithKey (\(_, w, h) _ -> (w, h) `elem` views)) $ readIORef (pages state)
-      case [(page,w,h) |
-            page <- sortBy (comparing (\i -> max (i - currPage) (2 * (currPage - i)))) [1..numPages],
-            (w,h) <- sortBy (flip compare) $ views,
-            (page,w,h) `Map.notMember` cache] of
-        [] -> renderThreadNotSoon state
-        (pageNum, width, height) : _ -> do -- Render a page
-          page <- documentGetPage doc (pageNum-1)
-          (docWidth, docHeight) <- pageGetSize page
-          let scaleFactor = min (fromIntegral width  / docWidth)
-                                (fromIntegral height / docHeight)
-          -- NOTE: we use 24 bits instead of 32 to cut down on size and time
-          (pixels, w, h, stride) <- withImageSurface FormatRGB24
-            (round $ scaleFactor * docWidth) (round $ scaleFactor * docHeight) (\surface -> do
-              renderWith surface $ do scale scaleFactor scaleFactor
-                                      setSourceRGB 1.0 1.0 1.0 >> paint -- draw page background
-                                      pageRender page -- draw page
-              return (,,,) `ap` imageSurfaceGetData surface
-                           `ap` imageSurfaceGetWidth surface
-                           `ap` imageSurfaceGetHeight surface
-                           `ap` imageSurfaceGetStride surface)
-          compression' <- readIORef (compression state)
-          let pixels' = compressWith (defaultCompressParams { compressLevel = compressionLevel compression' })
-                                     (BSL.fromChunks [pixels])
-          BSL.length pixels' `seq` return () -- avoid memory leak due to not being strict enough
-          writeIORef (pages state) (Map.insert (pageNum,width,height) (pixels', w, h, stride) cache)
-          mainWindows state >>= mapM_ widgetQueueDraw
-          renderThreadSoon state
-
-errorDialog msg = do
-  dialog <- messageDialogNew Nothing [DialogModal, DialogDestroyWithParent] MessageError ButtonsClose msg
-  dialogRun dialog
-  widgetDestroy dialog
-
-openDoc state uri = do
-  doc <- catchGError (documentNewFromFile uri Nothing)
-           (\x -> errorDialog ("Error opening file: " ++ show x {- TODO: ++ "\n\nURI:" ++ uri-}) >> return Nothing)
-  case doc of
-    Nothing -> return False
-    Just doc -> do
-      title <- doc `get` documentTitle
-      windowListToplevels >>=
-        mapM_ (flip windowSetTitle ((if null title then takeFileName uri else title) ++ " - PDF Presenter"))
-      pageAdjustment state `set` [
-        adjustmentLower := 1, adjustmentUpper :=> liftM fromIntegral (documentGetNPages doc), adjustmentValue :~ (+0)]
-      writeIORef (pages state) Map.empty
-      writeIORef (documentURL state) uri
-      writeIORef (document state) (Just doc)
-      return True
+startRenderThread state progress = renderThreadSoon where
+  renderThreadSoon = widgetShow progress >> timeoutAdd (renderThread >> return False) 1{-milliseconds-} >> return ()
+  renderThreadDelayed = widgetHide progress >> timeoutAdd (renderThread >> return False) 100{-milliseconds-} >> return ()
+  renderThread = do
+    doc <- readIORef (document state)
+    case doc of
+      Nothing -> renderThreadDelayed -- We have no document to render
+      Just doc -> do
+        numPages <- liftM round $ pageAdjustment state `get` adjustmentUpper
+        currPage <- liftM round $ pageAdjustment state `get` adjustmentValue
+        -- Get the sizes of views and clean the cache of sizes with no views
+        views <- liftM (nub . Map.elems) $ readIORef (views state)
+        cache <- liftM (Map.filterWithKey (\(_, w, h) _ -> (w, h) `elem` views)) $ readIORef (pages state)
+        -- Select a page to be rendered for a view that is not in the cache.
+        -- Choose the view close to the current page if possible.
+        case [(page,w,h) |
+              page <- sortBy (comparing (\i -> max (i - currPage) (2 * (currPage - i)))) [1..numPages],
+              (w,h) <- sortBy (flip compare) $ views,
+              (page,w,h) `Map.notMember` cache] of
+          -- If nothing to be rendered, then move to the slower timeout to avoid hogging the CPU.
+          [] -> renderThreadDelayed
+          -- Otherwise, render that page and store a compressed copy in the cache.
+          work@((pageNum, width, height) : _) -> do
+            progressBarSetFraction progress (1 - fromIntegral (length work) / fromIntegral (numPages * length views))
+            page <- documentGetPage doc (pageNum-1)
+            (docWidth, docHeight) <- pageGetSize page
+            -- Find a scaling factor that fits in the view while preserving aspect ratio
+            let scaleFactor = min (fromIntegral width  / docWidth)
+                                  (fromIntegral height / docHeight)
+            -- Render the page to an image surface
+            -- NOTE: we use 24 bits instead of 32 to cut down on size and time
+            (pixels, w, h, stride) <- withImageSurface FormatRGB24
+              (round $ scaleFactor * docWidth) (round $ scaleFactor * docHeight) (\surface -> do
+                renderWith surface $ do scale scaleFactor scaleFactor
+                                        setSourceRGB 1.0 1.0 1.0 >> paint -- draw a white page background
+                                        pageRender page -- draw page
+                return (,,,) `ap` imageSurfaceGetData surface
+                             `ap` imageSurfaceGetWidth surface
+                             `ap` imageSurfaceGetHeight surface
+                             `ap` imageSurfaceGetStride surface)
+            -- Compress the data stored in the image surface
+            compression' <- readIORef (compression state)
+            let pixels' = compressWith (defaultCompressParams { compressLevel = compressionLevel compression' })
+                                       (BSL.fromChunks [pixels])
+            BSL.length pixels' `seq` return () -- avoid memory leak due to not being strict enough
+            writeIORef (pages state) (Map.insert (pageNum,width,height) (pixels', w, h, stride) cache)
+            -- Redraw the windows and re-enter the render thread quickly in case their is more to render
+            mainWindows state >>= mapM_ widgetQueueDraw
+            renderThreadSoon

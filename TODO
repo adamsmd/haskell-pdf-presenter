@@ -1,0 +1,163 @@
+==================
+Features (TODO)
+==================
+
+Screen saver icon
+
+End time
+
+----
+
+Warning background color
+t - Shift t?
+Shift-p for stop
+
+stop resizing on dialogs?
+
+Ellapsed time/Timer mode
+  Dialog:
+   =12/24
+   =Mode
+   Icon for mode
+    (clock)
+    	⌚	231A Watch (wall clock)
+       	⌛	231B	 	HOURGLASS (time remaining)
+	⏰	23F0	 	ALARM CLOCK
+	⏱	23F1	 	STOPWATCH
+	⏲	23F2	 	TIMER CLOCK
+⌚  U+0231A  WATCH
+⌛  U+0231B  HOURGLASS
+⏰  U+023F0  ALARM CLOCK
+⏱  U+023F1  STOPWATCH
+⏳  U+023F3  HOURGLASS WITH FLOWING SAND
+⧖  U+029D6  WHITE HOURGLASS
+⧗  U+029D7  BLACK HOURGLASS
+
+
+-Ctrl-c: Does not work: C.catch mainGUI (\(e :: C.AsyncException) -> putStrLn (show e))
+Note mode
+Test on windows
+Naming convention
+---------
+
+cabal
+~/build/slider
+  Pens in different colors and sizes (2, 8, 32 pixels)
+  Zoom on individual slide
+Test multi-monitor on Xfce4
+
+NOTE: Memory performance is *much* better now
+
+=Shift to jump by ten
+=(Default timer of zero?)
++Freeze (it's like a mute mode)
++Notes mode
++Rendering status icon
+Overlay (skipped on back)
+Movies
+Black slide after end
+Single screen
+
+Config dialog (for compression(ick requires reload), anti-screen saver, mouse hiding, colors)
+
+++About dialog w/ help - on ?/h/ctrl-h key
+++Better error messages
+++Filter cache
+  - Wipe on reload
++Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
+Command line split percentage needs to be one of the stops
+If single screen, then put audience on top
+Swap screens (just go do non-fullscreen and manually swap?)
+Click on audience = advance slide
+Scroll: Right/Down vs Left/Up
+scroll up/down (zoom presenter(?))
+mouse wheel? select slide? select color? zoom?
+Timer:
+  ++Initial status
+  Wall clock (mode?)
+  Time elapsed
+Toggle Fullscreen:
+  use instead of refresh screen
+  full screen all (some?)
+  Menubar shadow:
+    https://bugs.launchpad.net/ubuntu/+source/unity/+bug/967193
+    Focus (bring to front?) audience window on either one being focused (brought to front?)
++Ctrl-Z minimizes:
+  Send-to-back or minimize button: ctrl-z?
++Command line option to change base font of metadata
+Auto-Stops on preview panes:
+  +, -, =, ctrl--, ctrl-+ for small movement
++Note mode (status? vertically divided box? SQUARE WITH LEFT HALF BLACK?):
+  Keyboard toggle: /, |
+  only show left half in thumbs and audience and preview next, but show right half in preview current
+  guess on startup based on aspect ratio (>= 2) (fails if vertical pages)
+
+      -u, --current-size=N          Percentage of the presenter screen to be used for the current slide. (Default 60)
+      -s, --switch-screens          Switch the presentation and the presenter screen.
+      -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.
+      -z, --disable-compression     Disable the compression of slide images to trade memory consumption for speed. (Avg. factor 30)
+
+Any key gets out of mute mode?
+test if works on MS Windows
+  Use of URI may be a problem
+  Basename may be a problem
+zoom?
+drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
+hilight cursor? big cursor? cursor shape?
+mouse cursor on audience vs presenter screen (click on audience, means next, on presenter means select)
+
+Does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
+What would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
+switch to demo
+vim or arrow key navigation on overview screen
+
+================
+Features (non-active)
+================
+
+Screen saver:
+  xdg-screensaver suspend WindowID
+  xset -dpms (avoid dimming?)
+  xset s off
+        bus = dbus.SessionBus()
+        self.ss = bus.get_object('org.gnome.ScreenSaver','/org/gnome/ScreenSaver')
+        self.cookie = None
+        self.cookie = self.ss.Inhibit("Disable Screensaver", "That's what I do.")
+        self.ss.UnInhibit(self.cookie)
+  look in mplayer source code
+  move mouse pointer?
+  +displayGetPointer/displayWarpPointer/windowGetScreen/screenGetDisplay
+
+Record slide timing (print to stdout?)
+  Record everything except window manager events
+  Print to stdout as you go
+  Pause recording (R?) - show status in meta-data
+  Print timer status changes
+  Print presenter dispaly changes
+
+Replay slides (status? three-quarters circle arrow? recycle symbol?):
+  read from stdin or file or cmd line
+  Start/stop/rewind replay (status?)
+    Separate dialog?
+
+Multiple pdf files:
+  store filename and current slide number of non-loaded
+  Switch via Ctrl-TAB
+  Seperate timers?
+
+Annotation mode (status?)
+
+Set boarder of time on even seconds
+
+-- overview in the presenter view:
+--   - possibly along with current
+--   - could have cool zoom out effect
+--   - partial zoom out
+
+-- "Yes" button
+
+-- hyperlinks (mouse cursor when hover): both Pdf-Presenter and pympress are useful to learn from here
+
+-- Store shortcuts in F11 keys (or alpha keys? shifted?)
+
+Sync with Audio recording (audio mark?)
