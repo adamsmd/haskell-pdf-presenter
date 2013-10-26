@@ -77,8 +77,8 @@ options = [
  , Option "" ["mute-black"] (setOption videoMute MuteBlack) "Start with mute to black"
  , Option "" ["mute-white"] (setOption videoMute MuteBlack) "Start with mute to white"
  , Option "" ["mute-off"] (setOption videoMute MuteBlack) "Start with no muting (default)"
- , Option "" ["slide"] (argOption initialSlide "slide" (maybeRead) "INT") "Initial slide (default 1)"
- , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> \x -> if 0 <= x && x <= 9 then Just x else Nothing) "[0-9]") "Compression level. 0 is None. 1 is fastest. 9 is best. (Default is 1.)"
+ , Option "" ["slide"] (argOption initialSlide "slide" maybeRead "INT") "Initial slide (default 1)"
+ , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]") "Compression level. 0 is None. 1 is fastest. 9 is best. (Default is 1.)"
  ]
 
 {- TODO:
@@ -124,6 +124,10 @@ maybeRead :: (Read a) => String -> Maybe a
 maybeRead str | [(n, "")] <- reads str = Just n
               | otherwise = Nothing
 
+-- Like "Just" but returns "Nothing" if a value is outside a range
+maybeRange lo hi x | 0 <= x && x <= 9 = Just x
+                   | otherwise = Nothing
+
 -- A list of the top level windows
 mainWindows state = -- NOTE: Order of windows effects which window is on top in fullscreen
   mapM (builderGetObject (builder state) castToWindow) ["presenterWindow", "audienceWindow"]
@@ -133,10 +137,9 @@ setOption opt val = NoArg $ \state -> writeIORef (opt state) val
 
 -- Set an option based on the argument given to a command line
 argOption :: (State -> IORef a) -> String -> (String -> Maybe a) -> String -> ArgDescr (State -> IO ())
-argOption opt name f = ReqArg (\val state -> do
-  case f val of
+argOption opt name f = ReqArg (\val state -> case f val of
     Nothing -> putStrLn ("ERROR: Invalid argument to option \""++name++"\": "++show val) >>
-               putStr ("\n" ++ (usageInfo header options)) >> exitFailure
+               putStr ("\n" ++ usageInfo header options) >> exitFailure
     Just val' -> writeIORef (opt state) val')
 
 ----------------
@@ -152,7 +155,7 @@ main = do
   state <- return State
     `ap` newIORef (10 * 60 * 1000 * 1000) {-startTime-}
     `ap` newIORef (5 * 60 * 1000 * 1000) {-warningTime-}
-    `ap` newIORef (0) {-20 * 60 * 1000 * 1000-} {-endTime-}
+    `ap` newIORef (0 * 60 * 1000 * 1000) {-20 * 60 * 1000 * 1000-} {-endTime-}
     `ap` newIORef Nothing {-file uri-}
     `ap` newIORef 1 {-compression-}
     `ap` newIORef 1 {-initial slide-}
@@ -177,9 +180,9 @@ main = do
     (opts, [file], []) -> do
       mapM_ ($ state) opts
       file' <- canonicalizePath file
-      postGUIAsync (openDoc state (Just $ "file://"++file') >> return ())
+      postGUIAsync (void $ openDoc state (Just $ "file://"++file'))
       guiMain state
-    (_, [_,_], []) -> putStrLn ("Error: Multiple files on command line") >> putStr (usageInfo header options)
+    (_, [_,_], []) -> putStrLn "Error: Multiple files on command line" >> putStr (usageInfo header options)
     (_, _, errors) -> putStrLn (concat errors) >> putStr (usageInfo header options)
 
 guiMain :: State -> IO ()
@@ -238,7 +241,7 @@ guiMain state = do
        -- ^ Really this should be run on redraw, but because the
        -- computation triggers more redraws, we have it here.  This
        -- may result in a 1/10 second lag before the label resizes.
-     
+
   -- *** Current slide number
   do eventBox <- builderGetObject (builder state) castToEventBox "slideEventBox"
      eventBox `on` buttonPressEvent $ tryEvent $
@@ -306,7 +309,7 @@ guiMain state = do
                        currTime <- getMicroseconds
                        fullscreen' <- readIORef (fullscreen state)
                        when (fullscreen' && currTime > mouseTimeout') $
-                         dw `drawWindowSetCursor` (Just blankCursor)
+                         dw `drawWindowSetCursor` Just blankCursor
                        return True) (5000{-milliseconds-})
         w `widgetAddEvents` [PointerMotionMask]
         oldCoordRef <- newIORef (0, 0)
@@ -425,7 +428,7 @@ handleKey _ _ name | name `elem` [ -- Ignore modifier keys
   "shift_l", "shift_r", "control_l", "control_r", "alt_l", "alt_r",
   "super_l", "super_r", "caps_lock", "menu", "xf86wakeup"]
   = return True
-handleKey state mods name = (putStrLn $ "Unknown key \""++name++"\" with mods "++show mods) >> return False
+handleKey state mods name = putStrLn ("Unknown key \""++name++"\" with mods "++show mods) >> return False
 
 -- Move back one slide in the history
 historyBack state = do
@@ -847,8 +850,8 @@ openDoc state (Just uri) = do
 -- require using postGUISync which causes delays that slow down the
 -- rendering.
 startRenderThread state progress = renderThreadSoon where
-  renderThreadSoon = widgetShow progress >> timeoutAdd (renderThread >> return False) 1{-milliseconds-} >> return ()
-  renderThreadDelayed = widgetHide progress >> timeoutAdd (renderThread >> return False) 100{-milliseconds-} >> return ()
+  renderThreadSoon = widgetShow progress >> void (timeoutAdd (renderThread >> return False) 1{-milliseconds-})
+  renderThreadDelayed = widgetHide progress >> void (timeoutAdd (renderThread >> return False) 100{-milliseconds-})
   renderThread = do
     doc <- readIORef (document state)
     case doc of
@@ -863,7 +866,7 @@ startRenderThread state progress = renderThreadSoon where
         -- Choose the view close to the current page if possible.
         case [(page,w,h) |
               page <- sortBy (comparing (\i -> max (i - currPage) (2 * (currPage - i)))) [1..numPages],
-              (w,h) <- sortBy (flip compare) $ views,
+              (w,h) <- sortBy (flip compare) views,
               (page,w,h) `Map.notMember` cache] of
           -- If nothing to be rendered, then move to the slower timeout to avoid hogging the CPU.
           [] -> renderThreadDelayed

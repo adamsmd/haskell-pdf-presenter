@@ -10,7 +10,7 @@ argument as in the following:
 
 For help with the command line use the "--help" flag.
 
-For help with the GUI press the "?" key when the programm is running.
+For help with the GUI press the "?" key when the program is running.
 
 ***********
 WARNING: This application intentionally disables both the screen saver
@@ -30,7 +30,7 @@ Features (Implemented)
       - Grows to fit size (usefull for session chairs)
       - Colors: white, red (warning), purple (overtime)
           Yeah, these colors are a bit strange, but I've chosen them to
-          be easily distinguishale even in paripheral vision or at a
+          be easily distinguishable even in peripheral vision or at a
           glance.  I don't know how well they work for color-blind
           people.  Feedback is welcome.
       - Double click to configure timer
@@ -49,7 +49,7 @@ Features (Implemented)
   - Preview
   - Thumbnails
     - Current slide highlighted
-    - Tooltips show slide number
+    - Tooltips show slide number (Currently disabled due to a bug in GTK)
     - Click to go to slide
     - Mouse wheel scrolls instead of changes slide
 
@@ -63,6 +63,9 @@ Features (Implemented)
   - Cache is filtered and wiped cleanly
 
 - Keybindings:
+  (Note that the keys are far appart on a Qwerty keyboard and irreversible
+  actions (e.g., resetting the timer) all use a modifier key.)
+
   - Switching slides:
     - Forward slide and unpause (shift moves by 10): space, page down, enter, right arrow, down arrow
     - Backward slide and unpause (shift moves by 10): back space, page up, left arrow, up arrow
@@ -115,6 +118,9 @@ Features (Implemented)
 ================
 Inspired by
 ================
-pdfpc: http://davvil.github.com/pdfpc/
-pdf-presenter-console: http://westhoffswelt.de/projects/pdf_presenter_console.html
-pympress
+
+* pdfpc: http://davvil.github.com/pdfpc/
+
+* pdf-presenter-console: http://westhoffswelt.de/projects/pdf_presenter_console.html
+
+* pympress: http://pympress.org/

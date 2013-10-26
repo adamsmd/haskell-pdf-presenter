@@ -1,6 +1,7 @@
 all:
 	@echo !!! This Makefile is for development purposes only. !!!
 	@echo !!! Users should instead use Setup.hs or cabal. !!!
+	@echo Targets: std prof clean
 	@exit 1
 
 WARNING_FLAGS=-W -Wall -fwarn-tabs -fwarn-incomplete-record-updates -fwarn-unused-do-bind -fno-warn-missing-signatures

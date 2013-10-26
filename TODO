@@ -2,17 +2,41 @@
 Features (TODO)
 ==================
 
-Screen saver icon (coffee cup?)
+Pre-render line smaller
 
-End time
+++Screen saver icon (coffee cup?)
+  +Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
+  - Z with circle (Zzz)
+  = Find icon
+  = Add text widget
+  = Add state bit
+  = Add event handler (include double click)
+
+Swap screens (just go do non-fullscreen and manually swap?)
+
+Record:
+  - timer settings
+  + slide number adjustment
+  - timer, clock
+  + video mute
+  ~ sync recording to clock?
+
+---
+
+
+Set boarder of time on even seconds
+  - Setting underline doesn't work (it is below the screen)
+  - Change color of text foreground?
+
+-- "Yes" button: Certain keys go to certain slides or to fixed text
+ - Ctrl-Shift Y = Yes
+ -- Store shortcuts in F11 keys (or alpha keys? shifted?)
+
+Slide duration and transition and urls/links and page index(?), or grouping
 
 ----
 
-Warning background color
-t - Shift t?
-Shift-p for stop
-
-stop resizing on dialogs?
+Settable background color
 
 Ellapsed time/Timer mode
   Dialog:
@@ -39,8 +63,10 @@ High voltage sign 	⚡ 	U+26A1
 Infinity
 
 -Ctrl-c: Does not work: C.catch mainGUI (\(e :: C.AsyncException) -> putStrLn (show e))
-Note mode
-Test on windows
+test if works on MS Windows
+  Use of URI may be a problem
+  Basename may be a problem
+
 Naming convention
 ---------
 
@@ -52,19 +78,15 @@ Test multi-monitor on Xfce4
 NOTE: Memory performance is *much* better now
 
 +Freeze (it's like a mute mode)
-+Notes mode
 Overlay (skipped on back)
 Movies
-Black slide after end
 Single screen
 
 Config dialog (for compression(ick requires reload), anti-screen saver, mouse hiding, colors)
 
 ++Better error messages
-+Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
 Command line split percentage needs to be one of the stops
 If single screen, then put audience on top
-Swap screens (just go do non-fullscreen and manually swap?)
 Click on audience = advance slide
 Scroll: Right/Down vs Left/Up
 scroll up/down (zoom presenter(?))
@@ -86,12 +108,8 @@ Toggle Fullscreen:
       -u, --current-size=N          Percentage of the presenter screen to be used for the current slide. (Default 60)
       -s, --switch-screens          Switch the presentation and the presenter screen.
       -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.
-      -z, --disable-compression     Disable the compression of slide images to trade memory consumption for speed. (Avg. factor 30)
 
 Any key gets out of mute mode?
-test if works on MS Windows
-  Use of URI may be a problem
-  Basename may be a problem
 zoom?
 drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
 hilight cursor? big cursor? cursor shape?
@@ -105,19 +123,6 @@ vim or arrow key navigation on overview screen
 ================
 Features (non-active)
 ================
-
-Screen saver:
-  xdg-screensaver suspend WindowID
-  xset -dpms (avoid dimming?)
-  xset s off
-        bus = dbus.SessionBus()
-        self.ss = bus.get_object('org.gnome.ScreenSaver','/org/gnome/ScreenSaver')
-        self.cookie = None
-        self.cookie = self.ss.Inhibit("Disable Screensaver", "That's what I do.")
-        self.ss.UnInhibit(self.cookie)
-  look in mplayer source code
-  move mouse pointer?
-  +displayGetPointer/displayWarpPointer/windowGetScreen/screenGetDisplay
 
 Record slide timing (print to stdout?)
   Record everything except window manager events
@@ -142,18 +147,7 @@ Multiple pdf files: (usefull for lightning talks)
 
 Annotation mode (status?)
 
-Set boarder of time on even seconds
-
--- overview in the presenter view:
---   - possibly along with current
---   - could have cool zoom out effect
---   - partial zoom out
-
--- "Yes" button: Certain keys go to certain slides or to fixed text
- - Ctrl-Shift Y = Yes
-
 -- hyperlinks (mouse cursor when hover): both Pdf-Presenter and pympress are useful to learn from here
 
--- Store shortcuts in F11 keys (or alpha keys? shifted?)
-
 Sync with Audio recording (audio mark?)
+  Say "mark" and then press "P" key loudly?
