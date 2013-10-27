@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, PatternGuards #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Codec.Compression.Zlib.Raw
