@@ -7,9 +7,9 @@
     <property name="border_width">5</property>
     <property name="destroy_with_parent">True</property>
     <property name="type_hint">dialog</property>
-    <property name="program_name">Pdf Presenter</property>
-    <property name="version">Version 0.1</property>
-    <property name="copyright" translatable="yes">Copyright 2012, Michael D. Adams</property>
+    <property name="program_name">Haskell Pdf Presenter</property>
+    <property name="version">Version 0.2</property>
+    <property name="copyright" translatable="yes">Copyright 2012-2013, Michael D. Adams</property>
     <property name="website">http://michaeldadams.org</property>
     <property name="website_label" translatable="yes">http://michaeldadams.org</property>
     <child internal-child="vbox">

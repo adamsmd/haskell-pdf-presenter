@@ -11,7 +11,6 @@ import Data.IORef
 import Data.List (sort, sortBy, nub)
 import Data.List.Split (splitOn)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 import Data.Time.LocalTime
 import Data.Time.Clock (getCurrentTime)
@@ -67,7 +66,7 @@ data State = State
  , pageAdjustment :: Adjustment
 }
 
-header = "Usage: PdfViewer [OPTION...] file"
+header = "Usage: hpdfp [OPTION...] file"
 options = [
    Option "t" ["start-time"] (argOption startTime "start-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Start time in minutes (default 10)"
  , Option "w" ["warning-time"] (argOption warningTime "warning-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Warning time in minutes (default 5)"
@@ -125,7 +124,8 @@ maybeRead str | [(n, "")] <- reads str = Just n
               | otherwise = Nothing
 
 -- Like "Just" but returns "Nothing" if a value is outside a range
-maybeRange lo hi x | 0 <= x && x <= 9 = Just x
+maybeRange :: Int -> Int -> Int -> Maybe Int
+maybeRange lo hi x | lo <= x && x <= hi = Just x
                    | otherwise = Nothing
 
 -- A list of the top level windows
@@ -191,7 +191,7 @@ guiMain :: State -> IO ()
 guiMain state = do
   -- Load and setup the GUI
   builderAddFromString (builder state)
-    $(let f = "presenter.glade" in addDependentFile f >> liftM (LitE . StringL) (runIO $ readFile f))
+    $(let f = "HaskellPdfPresenter.glade" in addDependentFile f >> liftM (LitE . StringL) (runIO $ readFile f))
 
   -- Finish setting up the state and configure gui to match state
   pageAdjustment state `set` [adjustmentUpper :=> liftM fromIntegral (readIORef (initialSlide state)),
@@ -252,7 +252,7 @@ guiMain state = do
      let update = do p <- liftM round $ pageAdjustment state `get` adjustmentValue
                      n <- liftM round $ pageAdjustment state `get` adjustmentUpper
                      l <- liftM round $ pageAdjustment state `get` adjustmentLower
-                     when (l /= 0) $ slideNum `set` [
+                     when ((l :: Integer) /= 0) $ slideNum `set` [
                        labelText := show (p :: Integer) ++ "/" ++ show (n :: Integer),
                        labelAttributes := [AttrSize 0 (negate 1) textSize, -- TODO: we have to do this to get the right font???
                                            AttrForeground 0 (negate 1) white]]
@@ -356,7 +356,7 @@ recomputeThumbnails state newWidth = do
 -- Apply "f" to the current page number
 gotoPage state f = do
   oldPage <- liftM round $ pageAdjustment state `get` adjustmentValue
-  pageAdjustment state `set` [adjustmentValue := fromIntegral (f oldPage)]
+  pageAdjustment state `set` [adjustmentValue := fromIntegral ((f :: Int -> Int) oldPage)]
   newPage <- liftM round $ pageAdjustment state `get` adjustmentValue
   -- Update the history if needed
   when (oldPage /= newPage) $ do
@@ -378,11 +378,11 @@ handleKey state [Control] "q" = mainQuit >> return True
 handleKey state _ "h" = builderGetObject (builder state) castToAboutDialog "aboutDialog" >>= widgetShowAll >> return True
 handleKey state _ "question" = builderGetObject (builder state) castToAboutDialog "aboutDialog" >>= widgetShowAll >> return True
 handleKey state [] key | key `elem` ["left", "up", "page_up", "backspace"] =
-  gotoPage state (+(negate 1)) >> modifyTimerState state unpauseTimer >> return True
+  gotoPage state (+(-1)) >> modifyTimerState state unpauseTimer >> return True
 handleKey state [] key | key `elem` ["right", "down", "page_down", "right", "space", "return"] =
   gotoPage state (+1) >> modifyTimerState state unpauseTimer >> return True
 handleKey state [Shift] key | key `elem` ["left", "up", "page_up", "backspace"] =
-  gotoPage state (+(negate 10)) >> modifyTimerState state unpauseTimer >> return True
+  gotoPage state (+(-10)) >> modifyTimerState state unpauseTimer >> return True
 handleKey state [Shift] key | key `elem` ["right", "down", "page_down", "right", "space", "return"] =
   gotoPage state (+10) >> modifyTimerState state unpauseTimer >> return True
 handleKey state [] "home" = gotoPage state (const 0) >> return True
@@ -397,11 +397,11 @@ handleKey state [Shift] "p" = modifyTimerState state toggleStopTimer >> return T
 handleKey state [Control] "p" = modifyTimerState state toggleStopTimer >> return True
 handleKey state [] "pause" = modifyTimerState state togglePauseTimer >> return True
 handleKey state [] "bracketleft" =
-  builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ max 0 . (+(negate 20))]) >> return True
+  builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ max 0 . (+(-20))]) >> return True
 handleKey state [] "bracketright" =
   builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ (+20)]) >> return True
 handleKey state [Shift] "braceleft" =
-  builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ max 0 . (+(negate 1))]) >> return True
+  builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ max 0 . (+(-1))]) >> return True
 handleKey state [Shift] "braceright" =
   builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ (+1)]) >> return True
 handleKey state [] "equal" = panedStops state >> return True
@@ -526,10 +526,10 @@ changeMonitors state f = do
       -- but that also triggers render errors.  I don't know why.
       readIORef (fullscreen state) >>= flip when (toggleFullScreen state)
       let (mP', mA') = f inc mP mA
-          moveTo w m = do Rectangle x y wid hi <- screenGetMonitorGeometry screenP m
-                          windowMove w x y
-      when (mP /= mP') $ moveTo wP mP'
-      when (mA /= mA') $ moveTo wA mA'
+          moveWindow w m = do Rectangle x y _ _ <- screenGetMonitorGeometry screenP m
+                              windowMove w x y
+      when (mP /= mP') $ moveWindow wP mP'
+      when (mA /= mA') $ moveWindow wA mA'
       return True
 
 ----------------
@@ -631,7 +631,7 @@ gotoSlideDialog state = do
 openFileDialog state = do
   dialog <- fileChooserDialogNew Nothing Nothing FileChooserActionOpen
             [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
-  maybe (return True) (fileChooserSetURI dialog) =<< readIORef (documentURL state)
+  maybe (return ()) (void . fileChooserSetURI dialog) =<< readIORef (documentURL state)
   loopDialog dialog (openDoc state . Just . head =<< fileChooserGetURIs dialog)
   widgetDestroy dialog
   return True
@@ -843,7 +843,7 @@ parseTime str = go (filter (not . isSpace) str) where
     time | Just h <- maybeRead hr, Just m <- maybeRead min, Just s <- maybeRead sec
          = Just $ 1000 * 1000 * (s + 60 * (m + 60 * h))
          | otherwise = Nothing
-    (sec : min : hr : _) = (reverse (splitOn ":" str)) ++ repeat "0"
+    (sec : min : hr : _) = reverse (splitOn ":" str) ++ repeat "0"
 
 -- Format time for display to user.  Format: H:MM:SS or -H:MM:SS
 formatTime :: Integer -> String
@@ -878,7 +878,7 @@ openDoc state (Just uri) = do
       -- Use the document title or filename as the window title
       title <- doc `get` documentTitle
       windowListToplevels >>=
-        mapM_ (`windowSetTitle` ((if null title then takeFileName uri else title) ++ " - PDF Presenter"))
+        mapM_ (`windowSetTitle` ((if null title then takeFileName uri else title) ++ " - Haskell PDF Presenter"))
       -- Ensure that the current page number is in bounds for the new document
       -- NOTE: we increment the current page number by 0 to trigger the range clamping on pageAdjustment
       pageAdjustment state `set` [
