@@ -6,7 +6,7 @@ import Control.Monad
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Unsafe as BSU
-import Data.Char (toLower)
+import Data.Char (toLower, isSpace)
 import Data.IORef
 import Data.List (sort, sortBy, nub)
 import Data.List.Split (splitOn)
@@ -130,7 +130,9 @@ maybeRange lo hi x | 0 <= x && x <= 9 = Just x
 
 -- A list of the top level windows
 mainWindows state = -- NOTE: Order of windows effects which window is on top in fullscreen
-  mapM (builderGetObject (builder state) castToWindow) ["presenterWindow", "audienceWindow"]
+  mapM (builderGetObject (builder state) castToWindow) [presenterWindow, audienceWindow]
+presenterWindow = "presenterWindow"
+audienceWindow = "audienceWindow"
 
 -- Set an option to a given value when a command line flag is set
 setOption opt val = NoArg $ \state -> writeIORef (opt state) val
@@ -199,7 +201,7 @@ guiMain state = do
 
   -- Connect the widgets to their events
   -- * Audience Window
-  do window <- builderGetObject (builder state) castToWindow "audienceWindow"
+  do window <- builderGetObject (builder state) castToWindow audienceWindow
      view <- makeView state id (postDrawVideoMute state)
      window `containerAdd` view
 
@@ -287,7 +289,7 @@ guiMain state = do
 
   -- TODO: cleanup
   -- Special configuration for the audience window
-  do w <- builderGetObject (builder state) castToWindow "audienceWindow"
+  do w <- builderGetObject (builder state) castToWindow audienceWindow
      dw <- widgetGetDrawWindow w
 
      -- Put audience window on second screen if present
@@ -424,6 +426,14 @@ handleKey state [] "c" = modifyClockState state (\c -> case c of
 handleKey state [Shift] "c" = modifyTimerState state (const $ liftM (Stopped True 0) (readIORef (startTime state))) >> return True
  -- ^ TODO: reset to what was set on cmd line?
 handleKey state [Control] "c" = timerDialog state >> return True
+handleKey state [] "s" = changeMonitors state f where
+  f inc mP mA = if inc 1 mA == mP then (inc 1 mP, inc 1 mP) else (mP, inc 1 mA)
+handleKey state [Shift] "s" = changeMonitors state f where
+  f inc mP mA = if mA == mP then (inc (-1) mP, inc (-2) mP) else (mP, inc (-1) mA)
+handleKey state [Control] "s" = changeMonitors state f where
+  f inc mP mA = (inc 1 mP, mA)
+handleKey state [Shift,Control] "s" = changeMonitors state f where
+  f inc mP mA = (inc (-1) mP, mA)
 handleKey _ _ name | name `elem` [ -- Ignore modifier keys
   "shift_l", "shift_r", "control_l", "control_r", "alt_l", "alt_r",
   "super_l", "super_r", "caps_lock", "menu", "xf86wakeup"]
@@ -488,6 +498,39 @@ panedStops state = do
   paned `set` [panedPosition := case sort $ filter (> oldPos) $ stops ++ stops' of
                                   [] -> 0 -- If no more stops, go fully left
                                   (x:_) -> x]
+
+-- Move the windows between the available monitors according to the
+-- provided f function.  For forwards movement, the order is that we
+-- always move the audience view first, but if the audience view would
+-- move to the same monitor as the presenter view then we advance the
+-- presenter view and also move the audience view to that monitor.
+changeMonitors state f = do
+  wP <- builderGetObject (builder state) castToWindow presenterWindow
+  wA <- builderGetObject (builder state) castToWindow audienceWindow
+  screenP <- wP `get` windowScreen
+  screenA <- wA `get` windowScreen
+  if screenP /= screenA
+    then do errorDialog ("Cannot move windows as the presenter and audience windows are on different screens.\n\n"++
+                         "Contact the developer if you want support for this.")
+            return True
+    else do
+      dwP <- widgetGetDrawWindow wP
+      dwA <- widgetGetDrawWindow wA
+      n <- screenGetNMonitors screenP
+      let inc offset x = (x + offset) `mod` n
+      mP <- screenGetMonitorAtWindow screenP dwP
+      mA <- screenGetMonitorAtWindow screenA dwA
+      -- There are render glitches if we move the windows while in full screen
+      -- so we have to move out of full screen before moving.
+      -- It would be nice if we could move back into full screen after moving
+      -- but that also triggers render errors.  I don't know why.
+      readIORef (fullscreen state) >>= flip when (toggleFullScreen state)
+      let (mP', mA') = f inc mP mA
+          moveTo w m = do Rectangle x y wid hi <- screenGetMonitorGeometry screenP m
+                          windowMove w x y
+      when (mP /= mP') $ moveTo wP mP'
+      when (mA /= mA') $ moveTo wA mA'
+      return True
 
 ----------------
 -- Dialogs
@@ -790,15 +833,17 @@ displayTime state = do
 -- Time formatting
 ------------------------
 
--- Parse time entered by the user.  Format: -?[0-9]*:[0-9]*:[0-9]*
+-- Parse time entered by the user.
+-- The accepted format is "-* ((\d+:)? \d+:)? \d+" but white spaces are allowed anywhere.
 -- TODO: I'd really prefer to use standard code for this, but I couldn't find any
 parseTime :: String -> Maybe Integer{-microseconds-}
-parseTime ('-' : str) = liftM negate (parseTime str)
-parseTime str = time where
-  time | Just h <- maybeRead hr, Just m <- maybeRead min, Just s <- maybeRead sec
-       = Just $ 1000 * 1000 * (s + 60 * (m + 60 * h))
-       | otherwise = Nothing
-  (sec : min : hr : _) = reverse (splitOn ":" str) ++ repeat "0"
+parseTime str = go (filter (not . isSpace) str) where
+  go ('-' : str) = liftM negate (go str)
+  go str = time where
+    time | Just h <- maybeRead hr, Just m <- maybeRead min, Just s <- maybeRead sec
+         = Just $ 1000 * 1000 * (s + 60 * (m + 60 * h))
+         | otherwise = Nothing
+    (sec : min : hr : _) = (reverse (splitOn ":" str)) ++ repeat "0"
 
 -- Format time for display to user.  Format: H:MM:SS or -H:MM:SS
 formatTime :: Integer -> String

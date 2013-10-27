@@ -55,9 +55,12 @@ Features (Implemented)
 
 - Audience view
   - Mouse hides after ~3 seconds
+  - Shows on top if there is only one screen
 
 - Rendering
-  - Slides are rendered in the background
+  - Slides are pre-rendered in the background
+  - Pre-rendered slides are compressed to memory usage is low
+      (e.g., my disseration defense with 95 slides takes only 55MB at max resolution)
   - slide number or file name until rendered
   - Renders slide close to current slide first (at a rate of two forward per one backward)
   - Cache is filtered and wiped cleanly
@@ -124,3 +127,18 @@ Inspired by
 * pdf-presenter-console: http://westhoffswelt.de/projects/pdf_presenter_console.html
 
 * pympress: http://pympress.org/
+
+================
+Known Bugs
+================
+
+If you
+  (1) are in full screen mode,
+  (2) are displaying to two monitors,
+  (3) have the presenter toggled to show thumbnails, and
+  (4) hover the mouse over the vertical scroll bar,
+then the rendering will glitch and show older versions of the screen.
+I don't know why this happens, but I'm guessing it is a bug in GTK.
+A similar bug happens if you put tooltips on the thumbnails (which
+are currently disabled to avoid that bug).  Any help in solving
+this bug would be appreciated.

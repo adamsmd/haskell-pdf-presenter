@@ -1,8 +1,16 @@
-==================
-Features (TODO)
-==================
+================
+Undocumented features
+================
+Swap screens (just go do non-fullscreen and manually swap?)
+  S - advance audience, but if behind presenter then advance presenter and move audience to presenter
+  Shift - reverses
+  Ctrl - advance presenter
 
-Pre-render line smaller
+Times are [-][[[\w\d]*:][\w\d]*:][\w\d]*
+
+==================
+Possible Future Features
+==================
 
 ++Screen saver icon (coffee cup?)
   +Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
@@ -12,17 +20,18 @@ Pre-render line smaller
   = Add state bit
   = Add event handler (include double click)
 
-Swap screens (just go do non-fullscreen and manually swap?)
-
 Record:
   - timer settings
   + slide number adjustment
   - timer, clock
   + video mute
   ~ sync recording to clock?
+    (unneeded, "clap" to sync audio to video, advance slide to sync video to slides, hit key hard to sync audio to slides)
+  + Format: time (slide|unknown key|blank|open file)
 
 ---
 
+Pre-render line sice (5px?)
 
 Set boarder of time on even seconds
   - Setting underline doesn't work (it is below the screen)
@@ -61,21 +70,20 @@ Ellapsed time/Timer mode
 High voltage sign 	⚡ 	U+26A1
  U+221E ∞ infinity
 Infinity
+Lock, key
 
--Ctrl-c: Does not work: C.catch mainGUI (\(e :: C.AsyncException) -> putStrLn (show e))
 test if works on MS Windows
   Use of URI may be a problem
   Basename may be a problem
 
 Naming convention
+
 ---------
 
 ~/build/slider
   Pens in different colors and sizes (2, 8, 32 pixels)
   Zoom on individual slide
 Test multi-monitor on Xfce4
-
-NOTE: Memory performance is *much* better now
 
 +Freeze (it's like a mute mode)
 Overlay (skipped on back)
@@ -86,7 +94,6 @@ Config dialog (for compression(ick requires reload), anti-screen saver, mouse hi
 
 ++Better error messages
 Command line split percentage needs to be one of the stops
-If single screen, then put audience on top
 Click on audience = advance slide
 Scroll: Right/Down vs Left/Up
 scroll up/down (zoom presenter(?))
