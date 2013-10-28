@@ -70,27 +70,29 @@ data State = State
  , pageAdjustment :: Adjustment
 }
 
-header = "Usage: hpdfp [OPTION...] file"
+header = "Haskell Pdf Presenter, version 0.2\nUsage: hpdfp [OPTION...] file"
 options = [
    Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
-
- , Option "t" ["start-time"] (argOption startTime "start-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Start time in minutes (default 10)"
- , Option "w" ["warning-time"] (argOption warningTime "warning-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Warning time in minutes (default 5)"
- , Option "" ["end-time"] (argOption endTime "end-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "End time in minutes (default 0)"
-
- , Option "f" ["fullscreen"] (setOption fullscreen True) "Full screen on startup (default off)"
- , Option "" ["mute-black"] (setOption videoMute MuteBlack) "Start with mute to black"
- , Option "" ["mute-white"] (setOption videoMute MuteBlack) "Start with mute to white"
- , Option "" ["mute-off"] (setOption videoMute MuteBlack) "Start with no muting (default)"
- , Option "c" ["clock-mode"] (enumOption clock "clock-mode"
-                              [("remaining", RemainingTime), ("elapsed", ElapsedTime), ("12hour", WallTime12), ("24hour", WallTime24)]
-                              "MODE") "Initial mode for the clock (default \"remaining\").  MODE is one of \"remaining\", \"elapsed\", \"12hour\" or \"24hour\"."
- , Option "p" ["preview-percentage"] (argOption initPreviewPercentage "preview-percentage" maybeRead "INT") "Initial preview percentage"
- , Option "" ["presenter-monitor"] (argOption initPresenterMonitor "presenter-monitor" maybeRead "INT") "Initial monitor for presenter window"
- , Option "" ["audience-monitor"] (argOption initAudienceMonitor "audience-monitor" maybeRead "INT") "Initial monitor for audience window"
-
- , Option "" ["slide"] (argOption initSlide "slide" maybeRead "INT") "Initial slide (default 1)"
- , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]") "Compression level. 0 is None. 1 is fastest. 9 is best. (Default is 1.)"
+ , Option "s" ["slide"] (argOption initSlide "slide" maybeRead "INT") "Initial slide number (default 1)"
+ , Option "t" ["start-time", "starting-time"] (argOption startTime "start-time" parseTime "TIME")
+              "Start time (default 10:00)"
+ , Option "w" ["warn-time", "warning-time"] (argOption warningTime "warning-time" parseTime "TIME")
+              "Warning time (default 5:00)"
+ , Option "e" ["end-time", "ending-time"] (argOption endTime "end-time" (parseTime) "TIME")
+              "End time (default 0:00)"
+ , Option "f" ["fullscreen"] (setOption fullscreen True) "Full screen on startup"
+ , Option "p" ["preview-percentage"] (argOption initPreviewPercentage "preview-percentage" maybeRead "INT")
+              "Initial preview percentage (default 50)"
+ , Option "" ["presenter-monitor"] (argOption initPresenterMonitor "presenter-monitor" maybeRead "INT")
+              "Initial monitor for presenter window (default 0)"
+ , Option "" ["audience-monitor"] (argOption initAudienceMonitor "audience-monitor" maybeRead "INT")
+              "Initial monitor for audience window (default 1)"
+ , Option "" ["video-mute"] (enumOption videoMute "mute" [("black", MuteBlack), ("white", MuteWhite), ("off", MuteOff)] "MODE")
+              "Initial video mute mode: \"black\", \"white\", or \"off\" (default)"
+ , Option "" ["clock-mode"] (enumOption clock "clock-mode" [("remaining", RemainingTime), ("elapsed", ElapsedTime), ("12hour", WallTime12), ("24hour", WallTime24)] "MODE")
+              "Initial clock mode: \"remaining\" (default), \"elapsed\", \"12hour\" or \"24hour\""
+ , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]")
+              "Compression level (default 1). 0 is none. 1 is fastest. 9 is best."
  ]
 
 {- TODO:
@@ -99,7 +101,6 @@ options = [
  , Option "" ["timer=stopped"] (setOption timer (Counting (error "internal error: paused"))) "Start with timer stopped"
 -- colors for overtime, warning, and normal
 -- metadata font size
--- swap screens
 -- start record
 -- note mode
 -- +prerender size (zero means no bound)
@@ -877,7 +878,7 @@ parseTime str = go (filter (not . isSpace) str) where
   go ('-' : str) = liftM negate (go str)
   go str = time where
     time | Just h <- maybeRead hr, Just m <- maybeRead min, Just s <- maybeRead sec
-         = Just $ 1000 * 1000 * (s + 60 * (m + 60 * h))
+         = Just $ round $ (1000 * 1000 * (s + 60 * (m + 60 * h)) :: Double)
          | otherwise = Nothing
     (sec : min : hr : _) = reverse (splitOn ":" str) ++ repeat "0"
 
