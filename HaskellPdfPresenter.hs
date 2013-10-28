@@ -1,7 +1,8 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, PatternGuards #-}
 module Main where
 
 import Codec.Compression.Zlib.Raw
+import Control.Exception (catch)
 import Control.Monad
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -78,7 +79,7 @@ options = [
               "Start time (default 10:00)"
  , Option "w" ["warn-time", "warning-time"] (argOption warningTime "warning-time" parseTime "TIME")
               "Warning time (default 5:00)"
- , Option "e" ["end-time", "ending-time"] (argOption endTime "end-time" (parseTime) "TIME")
+ , Option "e" ["end-time", "ending-time"] (argOption endTime "end-time" parseTime "TIME")
               "End time (default 0:00)"
  , Option "f" ["fullscreen"] (setOption fullscreen True) "Full screen on startup"
  , Option "p" ["preview-percentage"] (argOption initPreviewPercentage "preview-percentage" maybeRead "INT")
@@ -166,7 +167,7 @@ argOption opt name f = ReqArg (\val state -> case f val of
 
 -- Set an option from a list of valid option values
 enumOption :: (State -> IORef a) -> String -> [(String, a)] -> String -> ArgDescr (State -> IO ())
-enumOption opt name options = argOption opt name (`lookup` options)
+enumOption opt name optList = argOption opt name (`lookup` optList)
 
 ----------------
 -- Main Program
@@ -878,7 +879,7 @@ parseTime str = go (filter (not . isSpace) str) where
   go ('-' : str) = liftM negate (go str)
   go str = time where
     time | Just h <- maybeRead hr, Just m <- maybeRead min, Just s <- maybeRead sec
-         = Just $ round $ (1000 * 1000 * (s + 60 * (m + 60 * h)) :: Double)
+         = Just $ round (1000 * 1000 * (s + 60 * (m + 60 * h)) :: Double)
          | otherwise = Nothing
     (sec : min : hr : _) = reverse (splitOn ":" str) ++ repeat "0"
 
@@ -907,16 +908,16 @@ getTime format = do
 -- Load a new PDF document
 openDoc _ Nothing = errorDialog "Cannot open file: No file selected" >> return False
 openDoc state (Just uri) = do
-  doc <- catchGError (documentNewFromFile uri Nothing)
-           (\x -> errorDialog ("Error opening \"" ++ uri ++ "\": " ++ show x) >> return Nothing)
+  doc <- catch (documentNewFromFile uri Nothing)
+           (\x -> errorDialog ("Error opening \"" ++ uri ++ "\": " ++ show (x :: GError)) >> return Nothing)
   case doc of
     Nothing -> return False -- Document failed to load
     Just doc -> do
       -- Use the document title or filename as the window title
       title <- doc `get` documentTitle
-      let windowTitle t = (if null title then takeFileName uri else title) ++ " (" ++ t ++ " Window) - " ++ appName
-      audienceWindow state >>= (`windowSetTitle` windowTitle "Audience")
-      presenterWindow state >>= (`windowSetTitle` windowTitle "Presenter")
+      let makeTitle t = (if null title then takeFileName uri else title) ++ " (" ++ t ++ " Window) - " ++ appName
+      audienceWindow state >>= (`windowSetTitle` makeTitle "Audience")
+      presenterWindow state >>= (`windowSetTitle` makeTitle "Presenter")
       -- Ensure that the current page number is in bounds for the new document
       -- NOTE: we increment the current page number by 0 to trigger the range clamping on pageAdjustment
       pageAdjustment state `set` [
