@@ -7,12 +7,10 @@ Name:                haskell-pdf-presenter
 Version:             0.2
 
 -- A short (one-line) description of the package.
-Synopsis:            Viewer for presenting PDF based presentations.
-
-Description:         This application is a viewer for presenting PDF files that contain a set of slides.  See the README for instructions on using it.
+Synopsis:            Tool for presenting PDF based presentations.
 
 -- A longer description of the package.
--- Description:         
+Description:         This application is a viewer for presenting PDF files that contain a set of slides.  It has many features and niceties for making life easier for the person delivering the presentation.
 
 -- URL for the project homepage or repository.
 Homepage:            http://michaeldadams.org/projects/haskell-pdf-presenter/
