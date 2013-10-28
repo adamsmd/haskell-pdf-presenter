@@ -782,9 +782,9 @@ beween monitors:</property>
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="xalign">0</property>
-                <property name="label" translatable="yes">S, Shift-S (reverse),
-Ctrl-S (only presenter window),
-Shift-Ctrl-S (reverse, only presenter)</property>
+                <property name="label" translatable="yes">S, Shift-S (reverse)
+(w/ Ctrl = move only presenter window)
+(w/ Alt = move only audience window)</property>
               </object>
               <packing>
                 <property name="left_attach">4</property>
@@ -805,7 +805,7 @@ Shift-Ctrl-S (reverse, only presenter)</property>
   </object>
   <object class="GtkWindow" id="audienceWindow">
     <property name="can_focus">False</property>
-    <property name="title" translatable="yes">PDF Presenter</property>
+    <property name="title" translatable="yes">Audience Window - Haskell Pdf Presenter</property>
     <property name="default_width">600</property>
     <property name="default_height">450</property>
     <child>
@@ -822,6 +822,7 @@ Shift-Ctrl-S (reverse, only presenter)</property>
   <object class="GtkDialog" id="pageDialog">
     <property name="can_focus">False</property>
     <property name="border_width">5</property>
+    <property name="title" translatable="yes">Goto Slide - Haskell Pdf Presenter</property>
     <property name="modal">True</property>
     <property name="destroy_with_parent">True</property>
     <property name="type_hint">dialog</property>
@@ -921,7 +922,7 @@ Shift-Ctrl-S (reverse, only presenter)</property>
   </object>
   <object class="GtkWindow" id="presenterWindow">
     <property name="can_focus">False</property>
-    <property name="title" translatable="yes">PDF Presenter</property>
+    <property name="title" translatable="yes">Presenter Window - Haskell Pdf Presenter</property>
     <property name="default_width">800</property>
     <property name="default_height">400</property>
     <child>
@@ -1243,6 +1244,7 @@ Shift-Ctrl-S (reverse, only presenter)</property>
   <object class="GtkDialog" id="timerDialog">
     <property name="can_focus">False</property>
     <property name="border_width">5</property>
+    <property name="title" translatable="yes">Clock Settings - Haskell Pdf Presenter</property>
     <property name="type_hint">dialog</property>
     <child internal-child="vbox">
       <object class="GtkBox" id="dialog-vbox4">

@@ -38,15 +38,18 @@ data VideoMuteState = MuteOff | MuteBlack | MuteWhite deriving (Eq)
 data ClockState = RemainingTime | ElapsedTime | WallTime12 | WallTime24
 
 data State = State
- {
+-- Settings that are used only at program initialization
+ { initSlide :: IORef Int
+ , initPreviewPercentage :: IORef Int
+ , initPresenterMonitor :: IORef Int
+ , initAudienceMonitor :: IORef Int
+
 -- Settable on command line
-   startTime :: IORef Integer{-microseconds-}
+ , startTime :: IORef Integer{-microseconds-}
  , warningTime :: IORef Integer{-microseconds-}
  , endTime :: IORef Integer{-microseconds-}
  , documentURL :: IORef (Maybe String)
  , compression :: IORef Int
- , initialSlide :: IORef Int
- , initialPreviewPercentage :: IORef Int
 
 -- Dynamic State
  , timer :: IORef TimerState -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
@@ -82,9 +85,11 @@ options = [
  , Option "c" ["clock-mode"] (enumOption clock "clock-mode"
                               [("remaining", RemainingTime), ("elapsed", ElapsedTime), ("12hour", WallTime12), ("24hour", WallTime24)]
                               "MODE") "Initial mode for the clock (default \"remaining\").  MODE is one of \"remaining\", \"elapsed\", \"12hour\" or \"24hour\"."
- , Option "p" ["preview-percentage"] (argOption initialPreviewPercentage "preview-percentage" maybeRead "INT") "Initial preview percentage"
+ , Option "p" ["preview-percentage"] (argOption initPreviewPercentage "preview-percentage" maybeRead "INT") "Initial preview percentage"
+ , Option "" ["presenter-monitor"] (argOption initPresenterMonitor "presenter-monitor" maybeRead "INT") "Initial monitor for presenter window"
+ , Option "" ["audience-monitor"] (argOption initAudienceMonitor "audience-monitor" maybeRead "INT") "Initial monitor for audience window"
 
- , Option "" ["slide"] (argOption initialSlide "slide" maybeRead "INT") "Initial slide (default 1)"
+ , Option "" ["slide"] (argOption initSlide "slide" maybeRead "INT") "Initial slide (default 1)"
  , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]") "Compression level. 0 is None. 1 is fastest. 9 is best. (Default is 1.)"
  ]
 
@@ -119,12 +124,17 @@ options = [
 heightFromWidth w = w * 3 `div` 4
 numColumns = 4
 textSize = 60
+mouseTimeoutDelay = 3 * 1000 * 1000 {-microseconds-}
+appName = "Haskell Pdf Presenter"
 
 -- Color constants
 red = Color 0xffff 0x0000 0x0000
 purple = Color 0x8888 0x3333 0xffff
 white = Color 0xffff 0xffff 0xffff
 black = Color 0x0000 0x0000 0x0000
+
+incMod x n = (x + 1) `mod` n
+decMod x n = (x - 1) `mod` n
 
 -- Like "read" but returns "Nothing" instead of throwing an exception
 maybeRead :: (Read a) => String -> Maybe a
@@ -137,10 +147,11 @@ maybeRange lo hi x | lo <= x && x <= hi = Just x
                    | otherwise = Nothing
 
 -- A list of the top level windows
-mainWindows state = -- NOTE: Order of windows effects which window is on top in fullscreen
-  mapM (builderGetObject (builder state) castToWindow) [presenterWindow, audienceWindow]
-presenterWindow = "presenterWindow"
-audienceWindow = "audienceWindow"
+-- NOTE: Order of windows effects which window is on top in fullscreen
+mainWindows state = mapM ($ state) [presenterWindow, audienceWindow]
+--  mapM (builderGetObject (builder state) castToWindow) [presenterWindow, audienceWindow]
+presenterWindow state = builderGetObject (builder state) castToWindow "presenterWindow"
+audienceWindow state = builderGetObject (builder state) castToWindow "audienceWindow"
 
 -- Set an option to a given value when a command line flag is set
 setOption opt val = NoArg $ \state -> writeIORef (opt state) val
@@ -162,18 +173,22 @@ enumOption opt name options = argOption opt name (`lookup` options)
 
 main :: IO ()
 main = do
-  -- Get program arguments.
+  -- Set initialize application and get program arguments
+  setApplicationName appName
   args <- initGUI
 
   -- Initialize shared state
   state <- return State
+    `ap` newIORef 1 {-init slide-}
+    `ap` newIORef 50 {-init preview percentage-}
+    `ap` newIORef 0 {-init presenter monitor-}
+    `ap` newIORef 1 {-init audience monitor-}
+
     `ap` newIORef (10 * 60 * 1000 * 1000) {-startTime-}
     `ap` newIORef (5 * 60 * 1000 * 1000) {-warningTime-}
     `ap` newIORef (0 * 60 * 1000 * 1000) {-20 * 60 * 1000 * 1000-} {-endTime-}
     `ap` newIORef Nothing {-file uri-}
     `ap` newIORef 1 {-compression-}
-    `ap` newIORef 1 {-initial slide-}
-    `ap` newIORef 50 {-initial preview percentage-}
 
     `ap` newIORef (error "internal error: undefined timer state")
     `ap` newIORef RemainingTime
@@ -207,14 +222,14 @@ guiMain state = do
     $(let f = "HaskellPdfPresenter.glade" in addDependentFile f >> liftM (LitE . StringL) (runIO $ readFile f))
 
   -- Finish setting up the state and configure gui to match state
-  pageAdjustment state `set` [adjustmentUpper :=> liftM fromIntegral (readIORef (initialSlide state)),
-                              adjustmentValue :=> liftM fromIntegral (readIORef (initialSlide state))]
+  pageAdjustment state `set` [adjustmentUpper :=> liftM fromIntegral (readIORef (initSlide state)),
+                              adjustmentValue :=> liftM fromIntegral (readIORef (initSlide state))]
   modifyTimerState state (const $ liftM (Stopped True 0) (readIORef (startTime state)))
   modifyVideoMute state return
 
   -- Connect the widgets to their events
   -- * Audience Window
-  do window <- builderGetObject (builder state) castToWindow audienceWindow
+  do window <- audienceWindow state
      view <- makeView state id (postDrawVideoMute state)
      window `containerAdd` view
 
@@ -295,55 +310,50 @@ guiMain state = do
            widgetShowAll window
      mapM_ setupWindow =<< mainWindows state
 
-  -- Adjust the preview slider (must be done after windows are shown)
+  -- * Put windows on correct monitors
+  join $ return moveWindow `ap` presenterWindow state `ap` readIORef (initPresenterMonitor state)
+  join $ return moveWindow `ap` audienceWindow state `ap` readIORef (initAudienceMonitor state)
+
+  -- * Adjust the preview splitter (must be done after windows are shown)
   do paned <- builderGetObject (builder state) castToPaned "preview.paned"
      maxPos <- paned `get` panedMaxPosition
-     percentage <- readIORef (initialPreviewPercentage state)
+     percentage <- readIORef (initPreviewPercentage state)
      paned `set` [panedPosition := maxPos * percentage `div` 100]
 
-  -- Setup about dialog
+  -- * Setup about dialog
   do dialog <- builderGetObject (builder state) castToAboutDialog "aboutDialog"
      dialog `on` response $ const $ widgetHideAll dialog
      dialog `on` deleteEvent $ liftIO (widgetHideAll dialog) >> return True
 
-  -- TODO: cleanup
-  -- Special configuration for the audience window
-  do w <- builderGetObject (builder state) castToWindow audienceWindow
+  -- * Make sure the screen saver doesn't start by moving the cursor.
+  --   Since we move the mouse by zero pixels, this shouldn't effect the user.
+  --   Also set up the handler for hiding the mouse after a delay.
+  do w <- audienceWindow state
      dw <- widgetGetDrawWindow w
-
-     -- Put audience window on second screen if present
-     do screen <- w `get` windowScreen
-        n <- screenGetNMonitors screen
-        when (n > 1) $ do Rectangle x y _ _ <- screenGetMonitorGeometry screen 1
-                          windowMove w x y
-
-     -- Make sure the screen saver doesn't start by moving the cursor.
-     -- Since we move the mouse by zero pixels, this shouldn't effect the user.
-     -- Also set up the handler for hiding the mouse after a delay.
-     do blankCursor <- cursorNew BlankCursor
-        timeoutAdd (do -- Move the cursor by zero pixels
-                       display <- screenGetDisplay =<< windowGetScreen w
-                       (screen, _, x, y) <- displayGetPointer display
-                       displayWarpPointer display screen x y
-                       -- Hide the mouse if needed.
-                       mouseTimeout' <- readIORef (mouseTimeout state)
-                       currTime <- getMicroseconds
-                       fullscreen' <- readIORef (fullscreen state)
-                       when (fullscreen' && currTime > mouseTimeout') $
-                         dw `drawWindowSetCursor` Just blankCursor
-                       return True) (5000{-milliseconds-})
-        w `widgetAddEvents` [PointerMotionMask]
-        oldCoordRef <- newIORef (0, 0)
-        let update = do dw `drawWindowSetCursor` Nothing
-                        writeIORef (mouseTimeout state) =<< liftM (+ 3 * 1000 * 1000) getMicroseconds
-        w `on` enterNotifyEvent $ liftIO update >> return False
-        -- Reset the timeout if the user moves the mouse
-        w `on` motionNotifyEvent $ do
-          coord <- eventRootCoordinates
-          oldCoord <- liftIO $ readIORef oldCoordRef
-          liftIO $ writeIORef oldCoordRef coord
-          when (oldCoord /= coord) $ liftIO update
-          return False
+     blankCursor <- cursorNew BlankCursor
+     timeoutAdd (do -- Move the cursor by zero pixels
+                    display <- screenGetDisplay =<< windowGetScreen w
+                    (screen, _, x, y) <- displayGetPointer display
+                    displayWarpPointer display screen x y
+                    -- Hide the mouse if needed.
+                    mouseTimeout' <- readIORef (mouseTimeout state)
+                    currTime <- getMicroseconds
+                    fullscreen' <- readIORef (fullscreen state)
+                    when (fullscreen' && currTime > mouseTimeout') $
+                      dw `drawWindowSetCursor` Just blankCursor
+                    return True) (5000{-milliseconds-})
+     w `widgetAddEvents` [PointerMotionMask]
+     oldCoordRef <- newIORef (0, 0)
+     let update = do dw `drawWindowSetCursor` Nothing
+                     writeIORef (mouseTimeout state) =<< liftM (+ mouseTimeoutDelay) getMicroseconds
+     w `on` enterNotifyEvent $ liftIO update >> return False
+     -- Reset the timeout if the user moves the mouse
+     w `on` motionNotifyEvent $ do
+       coord <- eventRootCoordinates
+       oldCoord <- liftIO $ readIORef oldCoordRef
+       liftIO $ writeIORef oldCoordRef coord
+       when (oldCoord /= coord) $ liftIO update
+       return False
 
   -- Schedule rendering, and start main loop
   startRenderThread state =<< builderGetObject (builder state) castToProgressBar "renderingProgressbar"
@@ -446,13 +456,13 @@ handleKey state [Shift] "c" = modifyTimerState state (const $ liftM (Stopped Tru
  -- ^ TODO: reset to what was set on cmd line?
 handleKey state [Control] "c" = timerDialog state >> return True
 handleKey state [] "s" = changeMonitors state f where
-  f inc mP mA = if inc 1 mA == mP then (inc 1 mP, inc 1 mP) else (mP, inc 1 mA)
+  f mP mA n = if mA `incMod` n == mP then (mP `incMod` n, mP `incMod` n) else (mP, mA `incMod` n)
 handleKey state [Shift] "s" = changeMonitors state f where
-  f inc mP mA = if mA == mP then (inc (-1) mP, inc (-2) mP) else (mP, inc (-1) mA)
-handleKey state [Control] "s" = changeMonitors state f where
-  f inc mP mA = (inc 1 mP, mA)
-handleKey state [Shift,Control] "s" = changeMonitors state f where
-  f inc mP mA = (inc (-1) mP, mA)
+  f mP mA n = if mA == mP then (mP `decMod` n, mP `decMod` n `decMod` n) else (mP, mA `decMod` n)
+handleKey state [Control] "s" = changeMonitors state f where f mP mA n = (mP `incMod` n, mA)
+handleKey state [Shift,Control] "s" = changeMonitors state f where f mP mA n = (mP `decMod` n, mA)
+handleKey state [Alt] "s" = changeMonitors state f where f mP mA n = (mP, mA `incMod` n)
+handleKey state [Shift,Alt] "s" = changeMonitors state f where f mP mA n = (mP, mA `decMod` n)
 handleKey _ _ name | name `elem` [ -- Ignore modifier keys
   "shift_l", "shift_r", "control_l", "control_r", "alt_l", "alt_r",
   "super_l", "super_r", "caps_lock", "menu", "xf86wakeup"]
@@ -524,8 +534,8 @@ panedStops state = do
 -- move to the same monitor as the presenter view then we advance the
 -- presenter view and also move the audience view to that monitor.
 changeMonitors state f = do
-  wP <- builderGetObject (builder state) castToWindow presenterWindow
-  wA <- builderGetObject (builder state) castToWindow audienceWindow
+  wP <- presenterWindow state
+  wA <- audienceWindow state
   screenP <- wP `get` windowScreen
   screenA <- wA `get` windowScreen
   if screenP /= screenA
@@ -535,8 +545,6 @@ changeMonitors state f = do
     else do
       dwP <- widgetGetDrawWindow wP
       dwA <- widgetGetDrawWindow wA
-      n <- screenGetNMonitors screenP
-      let inc offset x = (x + offset) `mod` n
       mP <- screenGetMonitorAtWindow screenP dwP
       mA <- screenGetMonitorAtWindow screenA dwA
       -- There are render glitches if we move the windows while in full screen
@@ -544,12 +552,21 @@ changeMonitors state f = do
       -- It would be nice if we could move back into full screen after moving
       -- but that also triggers render errors.  I don't know why.
       readIORef (fullscreen state) >>= flip when (toggleFullScreen state)
-      let (mP', mA') = f inc mP mA
-          moveWindow w m = do Rectangle x y _ _ <- screenGetMonitorGeometry screenP m
-                              windowMove w x y
-      when (mP /= mP') $ moveWindow wP mP'
-      when (mA /= mA') $ moveWindow wA mA'
+      n <- screenGetNMonitors screenP
+      let (mP', mA') = f mP mA n
+      moveWindow wP mP'
+      moveWindow wA mA'
       return True
+
+-- Move a window to a given monitor (mod the number of monitors) if it is not already there
+moveWindow w m = do
+  screen <- w `get` windowScreen
+  dw <- widgetGetDrawWindow w
+  m' <- screenGetMonitorAtWindow screen dw
+  n <- screenGetNMonitors screen
+  when (m' /= m `mod` n) $ do
+    Rectangle x y _ _ <- screenGetMonitorGeometry screen (m `mod` n)
+    windowMove w x y
 
 ----------------
 -- Dialogs
@@ -648,7 +665,7 @@ gotoSlideDialog state = do
 
 -- Open and run a modal file selection dialog and set load the PDF document that is selected.
 openFileDialog state = do
-  dialog <- fileChooserDialogNew Nothing Nothing FileChooserActionOpen
+  dialog <- fileChooserDialogNew (Just $ "Open - " ++ appName) Nothing FileChooserActionOpen
             [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
   maybe (return ()) (void . fileChooserSetURI dialog) =<< readIORef (documentURL state)
   loopDialog dialog (openDoc state . Just . head =<< fileChooserGetURIs dialog)
@@ -896,8 +913,9 @@ openDoc state (Just uri) = do
     Just doc -> do
       -- Use the document title or filename as the window title
       title <- doc `get` documentTitle
-      windowListToplevels >>=
-        mapM_ (`windowSetTitle` ((if null title then takeFileName uri else title) ++ " - Haskell PDF Presenter"))
+      let windowTitle t = (if null title then takeFileName uri else title) ++ " (" ++ t ++ " Window) - " ++ appName
+      audienceWindow state >>= (`windowSetTitle` windowTitle "Audience")
+      presenterWindow state >>= (`windowSetTitle` windowTitle "Presenter")
       -- Ensure that the current page number is in bounds for the new document
       -- NOTE: we increment the current page number by 0 to trigger the range clamping on pageAdjustment
       pageAdjustment state `set` [
