@@ -46,6 +46,7 @@ data State = State
  , documentURL :: IORef (Maybe String)
  , compression :: IORef Int
  , initialSlide :: IORef Int
+ , initialPreviewPercentage :: IORef Int
 
 -- Dynamic State
  , timer :: IORef TimerState -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
@@ -68,14 +69,21 @@ data State = State
 
 header = "Usage: hpdfp [OPTION...] file"
 options = [
-   Option "t" ["start-time"] (argOption startTime "start-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Start time in minutes (default 10)"
+   Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
+
+ , Option "t" ["start-time"] (argOption startTime "start-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Start time in minutes (default 10)"
  , Option "w" ["warning-time"] (argOption warningTime "warning-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "Warning time in minutes (default 5)"
  , Option "" ["end-time"] (argOption endTime "end-time" (liftM (round . (*(60*1000*1000::Double))) . maybeRead) "MIN") "End time in minutes (default 0)"
- , Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
+
  , Option "f" ["fullscreen"] (setOption fullscreen True) "Full screen on startup (default off)"
  , Option "" ["mute-black"] (setOption videoMute MuteBlack) "Start with mute to black"
  , Option "" ["mute-white"] (setOption videoMute MuteBlack) "Start with mute to white"
  , Option "" ["mute-off"] (setOption videoMute MuteBlack) "Start with no muting (default)"
+ , Option "c" ["clock-mode"] (enumOption clock "clock-mode"
+                              [("remaining", RemainingTime), ("elapsed", ElapsedTime), ("12hour", WallTime12), ("24hour", WallTime24)]
+                              "MODE") "Initial mode for the clock (default \"remaining\").  MODE is one of \"remaining\", \"elapsed\", \"12hour\" or \"24hour\"."
+ , Option "p" ["preview-percentage"] (argOption initialPreviewPercentage "preview-percentage" maybeRead "INT") "Initial preview percentage"
+
  , Option "" ["slide"] (argOption initialSlide "slide" maybeRead "INT") "Initial slide (default 1)"
  , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]") "Compression level. 0 is None. 1 is fastest. 9 is best. (Default is 1.)"
  ]
@@ -144,6 +152,10 @@ argOption opt name f = ReqArg (\val state -> case f val of
                putStr ("\n" ++ usageInfo header options) >> exitFailure
     Just val' -> writeIORef (opt state) val')
 
+-- Set an option from a list of valid option values
+enumOption :: (State -> IORef a) -> String -> [(String, a)] -> String -> ArgDescr (State -> IO ())
+enumOption opt name options = argOption opt name (`lookup` options)
+
 ----------------
 -- Main Program
 ----------------
@@ -161,6 +173,7 @@ main = do
     `ap` newIORef Nothing {-file uri-}
     `ap` newIORef 1 {-compression-}
     `ap` newIORef 1 {-initial slide-}
+    `ap` newIORef 50 {-initial preview percentage-}
 
     `ap` newIORef (error "internal error: undefined timer state")
     `ap` newIORef RemainingTime
@@ -281,6 +294,12 @@ guiMain state = do
            -- Show the window
            widgetShowAll window
      mapM_ setupWindow =<< mainWindows state
+
+  -- Adjust the preview slider (must be done after windows are shown)
+  do paned <- builderGetObject (builder state) castToPaned "preview.paned"
+     maxPos <- paned `get` panedMaxPosition
+     percentage <- readIORef (initialPreviewPercentage state)
+     paned `set` [panedPosition := maxPos * percentage `div` 100]
 
   -- Setup about dialog
   do dialog <- builderGetObject (builder state) castToAboutDialog "aboutDialog"
