@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, PatternGuards #-}
+{-# LANGUAGE TemplateHaskell, PatternGuards, TupleSections #-}
 module Main where
 
 import Codec.Compression.Zlib.Raw
@@ -44,6 +44,7 @@ data State = State
  , initPreviewPercentage :: IORef Int
  , initPresenterMonitor :: IORef Int
  , initAudienceMonitor :: IORef Int
+ , initTimerMode :: IORef (TimerState -> IO TimerState)
 
 -- Settable on command line
  , startTime :: IORef Integer{-microseconds-}
@@ -89,9 +90,13 @@ options = [
  , Option "" ["audience-monitor"] (argOption initAudienceMonitor "audience-monitor" maybeRead "INT")
               "Initial monitor for audience window (default 1)"
  , Option "" ["video-mute"] (enumOption videoMute "mute" [("black", MuteBlack), ("white", MuteWhite), ("off", MuteOff)] "MODE")
-              "Initial video mute mode: \"black\", \"white\", or \"off\" (default)"
+              "Initial video mute mode: \"black\", \"white\" or \"off\" (default)"
  , Option "" ["clock-mode"] (enumOption clock "clock-mode" [("remaining", RemainingTime), ("elapsed", ElapsedTime), ("12hour", WallTime12), ("24hour", WallTime24)] "MODE")
               "Initial clock mode: \"remaining\" (default), \"elapsed\", \"12hour\" or \"24hour\""
+ , Option "" ["timer-mode"] (enumOption initTimerMode "timer-mode" (
+                  map (,startTimer) ["play", "playing", "running", "start", "started"] ++
+                  map (,pauseTimer) ["pause", "paused"] ++ map (,stopTimer) ["stop", "stopped"]) "MODE")
+              "Initial timer mode: \"play\", \"pause\" (default) or \"stop\""
  , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]")
               "Compression level (default 1). 0 is none. 1 is fastest. 9 is best."
  ]
@@ -185,6 +190,7 @@ main = do
     `ap` newIORef 50 {-init preview percentage-}
     `ap` newIORef 0 {-init presenter monitor-}
     `ap` newIORef 1 {-init audience monitor-}
+    `ap` newIORef pauseTimer
 
     `ap` newIORef (10 * 60 * 1000 * 1000) {-startTime-}
     `ap` newIORef (5 * 60 * 1000 * 1000) {-warningTime-}
@@ -227,6 +233,7 @@ guiMain state = do
   pageAdjustment state `set` [adjustmentUpper :=> liftM fromIntegral (readIORef (initSlide state)),
                               adjustmentValue :=> liftM fromIntegral (readIORef (initSlide state))]
   modifyTimerState state (const $ liftM (Stopped True 0) (readIORef (startTime state)))
+  modifyTimerState state =<< readIORef (initTimerMode state)
   modifyVideoMute state return
 
   -- Connect the widgets to their events

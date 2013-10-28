@@ -8,6 +8,20 @@ Swap screens (just go do non-fullscreen and manually swap?)
 
 Times are [-][[[\w\d]*:][\w\d]*:][\w\d]*
 
+++Cmd line option for divider split --preview-split=percentage (can't do fit)
+-- Option "p" ["preview-percentage"]
+-- Option "c" ["clock-mode"]
+
+-- Option presenter-screen=INT
+-- Option audience-scree=INT
+-- Option "" ["timer-mode"]
+
+document "Alt-S'
+
+start times in parseable time format?
+
+Pre-render line size (5px?)
+
 ==================
 Possible Future Features
 ==================
@@ -19,6 +33,21 @@ Possible Future Features
   = Add text widget
   = Add state bit
   = Add event handler (include double click)
+  pango format angle (labelAngle :: LabelClass self => Attr self Double)
+  x239A; clear screen symbol ⎚
+  Star and crescent 	☪ 	U+262A
+  First quarter Moon 	☽ 	U+263D 	&#9789; 	Silver
+  Last quarter Moon 	☾ 	U+263E 	&#9790; 	
+  Warning sign 	⚠ 	U+26A0 	&#9888; 	
+  High voltage sign 	⚡ 	U+26A1 	&#9889; 	
+  U+2728 	✨ 	Sparkles
+  0337 ABC̷C
+  0338 ABC̸C
+  20E0 ABC⃠
+  20E5 ABC⃥
+
++Double click play opens dialog?
+ +Mute/screen saver dialog?
 
 Record:
   - timer settings
@@ -30,8 +59,6 @@ Record:
   + Format: time (slide|unknown key|blank|open file)
 
 ---
-
-Pre-render line sice (5px?)
 
 Set boarder of time on even seconds
   - Setting underline doesn't work (it is below the screen)
@@ -112,8 +139,6 @@ Toggle Fullscreen:
   only show left half in thumbs and audience and preview next, but show right half in preview current
   guess on startup based on aspect ratio (>= 2) (fails if vertical pages)
 
-      -u, --current-size=N          Percentage of the presenter screen to be used for the current slide. (Default 60)
-      -s, --switch-screens          Switch the presentation and the presenter screen.
       -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.
 
 Any key gets out of mute mode?
