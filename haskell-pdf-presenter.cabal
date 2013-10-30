@@ -18,8 +18,8 @@ Description:         The Haskell Pdf Presenter (hpdfp) is a tool for presenting 
 
                      There are a lot of features that may not be immediately obvious so
                      please be sure to look at the documentation.
-                     For help with the command line use the "--help" flag.
-                     For help with the GUI press the "?" key when the program is running.
+                     For help with the command line, use the "--help" flag.
+                     For help with the GUI, press the "?" key when the program is running.
                      The README contains a terse summary of all the features.
 
                      For more information and example uses, please visit the project home page.
@@ -43,7 +43,7 @@ Maintainer:          Michael D. Adams <http://michaeldadams.org/>
 -- A copyright notice.
 Copyright:           (c) 2012-2013, Michael D. Adams
 
-Category:            Application, Graphics, PDF
+Category:            Application, Graphics, Image Viewer, PDF
 
 Build-type:          Simple
 
