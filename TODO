@@ -1,30 +1,14 @@
 ================
 Undocumented features
 ================
-Swap screens (just go do non-fullscreen and manually swap?)
-  S - advance audience, but if behind presenter then advance presenter and move audience to presenter
-  Shift - reverses
-  Ctrl - advance presenter
-
-Times are [-][[[\w\d]*:][\w\d]*:][\w\d]*
-
-++Cmd line option for divider split --preview-split=percentage (can't do fit)
--- Option "p" ["preview-percentage"]
--- Option "c" ["clock-mode"]
-
--- Option presenter-screen=INT
--- Option audience-scree=INT
--- Option "" ["timer-mode"]
-
-document "Alt-S'
-
-start times in parseable time format?
-
-Pre-render line size (5px?)
 
 ==================
 Possible Future Features
 ==================
+
+Close PDF button
+
+Click to highlight mouse
 
 ++Screen saver icon (coffee cup?)
   +Disable suppression of screen saver?  Suppress screen saver only if full screen? Only if focused?
@@ -45,6 +29,11 @@ Possible Future Features
   0338 ABC̸C
   20E0 ABC⃠
   20E5 ABC⃥
+  \x263D Moon
+  High voltage sign 	⚡ 	U+26A1
+   U+221E ∞ infinity
+  Infinity
+  Lock, key
 
 +Double click play opens dialog?
  +Mute/screen saver dialog?
@@ -73,31 +62,6 @@ Slide duration and transition and urls/links and page index(?), or grouping
 ----
 
 Settable background color
-
-Ellapsed time/Timer mode
-  Dialog:
-   =12/24
-   =Mode
-   Icon for mode
-    (clock)
-    	⌚	231A Watch (wall clock)
-       	⌛	231B	 	HOURGLASS (time remaining)
-	⏰	23F0	 	ALARM CLOCK
-	⏱	23F1	 	STOPWATCH
-	⏲	23F2	 	TIMER CLOCK
-⌚  U+0231A  WATCH
-⌛  U+0231B  HOURGLASS
-⏰  U+023F0  ALARM CLOCK
-⏱  U+023F1  STOPWATCH
-⏳  U+023F3  HOURGLASS WITH FLOWING SAND
-⧖  U+029D6  WHITE HOURGLASS
-⧗  U+029D7  BLACK HOURGLASS
-\x2615 Coffie cup (lines are too thin)
-\x263D Moon
-High voltage sign 	⚡ 	U+26A1
- U+221E ∞ infinity
-Infinity
-Lock, key
 
 test if works on MS Windows
   Use of URI may be a problem
@@ -139,16 +103,13 @@ Toggle Fullscreen:
   only show left half in thumbs and audience and preview next, but show right half in preview current
   guess on startup based on aspect ratio (>= 2) (fails if vertical pages)
 
-      -c, --disable-cache           Disable caching and pre-rendering of slides to save memory at the cost of speed.
+Disable caching and pre-rendering of slides to save memory at the cost of speed.
 
 Any key gets out of mute mode?
 zoom?
 drawing? (w/ colors, undo, clear, cursor shape, on fresh slide)
 hilight cursor? big cursor? cursor shape?
 mouse cursor on audience vs presenter screen (click on audience, means next, on presenter means select)
-
-Does alt-tab do both presenter and audience? (if one window is foregound, then both should be?)
-What would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
 switch to demo
 vim or arrow key navigation on overview screen
 
@@ -176,6 +137,12 @@ Multiple pdf files: (usefull for lightning talks)
   store filename and current slide number of non-loaded
   Switch via Ctrl-TAB
   Seperate timers?
+  Could just open multiple applications
+    (or multiple windows in same app?)
+    (Ctrl-n to open new window/application?)
+    (but memory useage would be higher, but would be anyway since
+     loading multiple, but might be lower if not full screen)
+  What would ctrl-tab mean? switch to other pdf? switch mouse to presenter vs audience? swap presenter and audience windows?
 
 Annotation mode (status?)
 

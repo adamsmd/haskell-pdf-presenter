@@ -1,6 +1,4 @@
 {-# LANGUAGE TemplateHaskell, PatternGuards, TupleSections #-}
-module Main where
-
 import Codec.Compression.Zlib.Raw
 import Control.Exception (catch)
 import Control.Monad
@@ -82,7 +80,7 @@ options = [
               "Warning time (default 5:00)"
  , Option "e" ["end-time", "ending-time"] (argOption endTime "end-time" parseTime "TIME")
               "End time (default 0:00)"
- , Option "f" ["fullscreen"] (setOption fullscreen True) "Full screen on startup"
+ , Option "f" ["fullscreen"] (setOption fullscreen True) "Start in full screen mode"
  , Option "p" ["preview-percentage"] (argOption initPreviewPercentage "preview-percentage" maybeRead "INT")
               "Initial preview percentage (default 50)"
  , Option "" ["presenter-monitor"] (argOption initPresenterMonitor "presenter-monitor" maybeRead "INT")
@@ -102,9 +100,6 @@ options = [
  ]
 
 {- TODO:
- , Option "" ["timer=paused"] (setOption timer (Paused (error "internal error: paused"))) "Start with timer paused (default)"
- , Option "" ["timer=running"] (setOption timer (Stopped (error "internal error: paused"))) "Start with timer running"
- , Option "" ["timer=stopped"] (setOption timer (Counting (error "internal error: paused"))) "Start with timer stopped"
 -- colors for overtime, warning, and normal
 -- metadata font size
 -- start record
@@ -118,9 +113,8 @@ options = [
 -- stretch vs scale
 -- ++, Option "" ["anti-screensaver"] "always", "never", "fullscreen-only" (default = fullscreen only)
 -- TODO: on full screen, pull windows to front
--- TODO: option parsing (e.g. read shouldn't exit the program when can't parse)
 -- TODO: when repaint window, need to repaint all windows (store list of windows in State)
--- TODO: reset windows to default displays (or toggle if pressed again)
+-- TODO: left and right mouse click for forward and backward
 -}
 
 ----------------
@@ -259,7 +253,6 @@ guiMain state = do
        writeIORef oldWidth newWidth
        when (oldWidth' /= newWidth) $ recomputeThumbnails state newWidth)
      pageAdjustment state `onAdjChanged` (readIORef oldWidth >>= recomputeThumbnails state)
-     --onZoom $ recocmputeViews -- TODO: why was this here?
 
      -- Set a handler that scrolls to keep the current slide visible
      adjustment <- scrolledWindowGetVAdjustment =<<
@@ -405,16 +398,13 @@ gotoPage state f = do
 -- User Event handling
 ------------------------
 
--- TODO: left and right mouse click for forward and backward
--- TODO: help dialog: Shift-right = forward by 10, etc.
--- TODO: help dialog: Alt-left = history back, etc.
--- TODO: help dialog: shift-p = stop
-
 -- Handler for key presses from the user
 handleKey :: State -> [Modifier] -> String -> IO Bool
 handleKey state [Control] "q" = mainQuit >> return True
 handleKey state _ "h" = builderGetObject (builder state) castToAboutDialog "aboutDialog" >>= widgetShowAll >> return True
 handleKey state _ "question" = builderGetObject (builder state) castToAboutDialog "aboutDialog" >>= widgetShowAll >> return True
+
+-- Switching slides
 handleKey state [] key | key `elem` ["left", "up", "page_up", "backspace"] =
   gotoPage state (+(-1)) >> modifyTimerState state unpauseTimer >> return True
 handleKey state [] key | key `elem` ["right", "down", "page_down", "right", "space", "return"] =
@@ -426,14 +416,33 @@ handleKey state [Shift] key | key `elem` ["right", "down", "page_down", "right",
 handleKey state [] "home" = gotoPage state (const 0) >> return True
 handleKey state [] "end" =
   do p <- pageAdjustment state `get` adjustmentUpper; gotoPage state (const (round p)); return True
-handleKey state [] "tab" =
-  builderGetObject (builder state) castToNotebook "presenter.notebook" >>=
-    (`set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)]) >> return True
-handleKey state [Control] "r" = readIORef (documentURL state) >>= openDoc state >> return True
+handleKey state [Control] "g" = gotoSlideDialog state >> return True
+handleKey state [Alt] "left" = historyBack state >> return True
+handleKey state [] "xf86back" = historyBack state >> return True
+handleKey state [Alt] "right" = historyForward state >> return True
+handleKey state [] "xf86forward" = historyForward state >> return True
+
+-- Clock/timer control
 handleKey state [] "p" = modifyTimerState state togglePauseTimer >> return True
 handleKey state [Shift] "p" = modifyTimerState state toggleStopTimer >> return True
 handleKey state [Control] "p" = modifyTimerState state toggleStopTimer >> return True
 handleKey state [] "pause" = modifyTimerState state togglePauseTimer >> return True
+handleKey state [] "c" = modifyClockState state (\c -> case c of
+                              RemainingTime -> ElapsedTime
+                              ElapsedTime -> WallTime12
+                              WallTime12 -> WallTime24
+                              WallTime24 -> RemainingTime) >> return True
+handleKey state [Shift] "c" = modifyTimerState state (const $ liftM (Stopped True 0) (readIORef (startTime state))) >> return True
+handleKey state [Control] "c" = timerDialog state >> return True
+
+-- Video mute
+handleKey state [] "b" = modifyVideoMute state (\b -> return $ if b == MuteBlack then MuteOff else MuteBlack) >> return True
+handleKey state [] "w" = modifyVideoMute state (\b -> return $ if b == MuteWhite then MuteOff else MuteWhite) >> return True
+
+-- Presenter screen
+handleKey state [] "tab" =
+  builderGetObject (builder state) castToNotebook "presenter.notebook" >>=
+    (`set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)]) >> return True
 handleKey state [] "bracketleft" =
   builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ max 0 . (+(-20))]) >> return True
 handleKey state [] "bracketright" =
@@ -443,27 +452,17 @@ handleKey state [Shift] "braceleft" =
 handleKey state [Shift] "braceright" =
   builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ (+1)]) >> return True
 handleKey state [] "equal" = panedStops state >> return True
-handleKey state [] "b" = modifyVideoMute state (\b -> return $ if b == MuteBlack then MuteOff else MuteBlack) >> return True
-handleKey state [] "w" = modifyVideoMute state (\b -> return $ if b == MuteWhite then MuteOff else MuteWhite) >> return True
+
+-- Files
+handleKey state [Control] "r" = readIORef (documentURL state) >>= openDoc state >> return True
+handleKey state [Control] "o" = openFileDialog state >> return True
+
+-- Window control
 handleKey state [] "escape" = do f <- readIORef (fullscreen state); when f (toggleFullScreen state); return True
 handleKey state [] "f" = toggleFullScreen state >> return True
 handleKey state [] "f11" = toggleFullScreen state >> return True
 handleKey state [Alt] "return" = toggleFullScreen state >> return True
 handleKey state [Control] "l" = toggleFullScreen state >> return True
-handleKey state [Control] "g" = gotoSlideDialog state >> return True
-handleKey state [Control] "o" = openFileDialog state >> return True
-handleKey state [Alt] "left" = historyBack state >> return True
-handleKey state [] "xf86back" = historyBack state >> return True
-handleKey state [Alt] "right" = historyForward state >> return True
-handleKey state [] "xf86forward" = historyForward state >> return True
-handleKey state [] "c" = modifyClockState state (\c -> case c of
-                              RemainingTime -> ElapsedTime
-                              ElapsedTime -> WallTime12
-                              WallTime12 -> WallTime24
-                              WallTime24 -> RemainingTime) >> return True
-handleKey state [Shift] "c" = modifyTimerState state (const $ liftM (Stopped True 0) (readIORef (startTime state))) >> return True
- -- ^ TODO: reset to what was set on cmd line?
-handleKey state [Control] "c" = timerDialog state >> return True
 handleKey state [] "s" = changeMonitors state f where
   f mP mA n = if mA `incMod` n == mP then (mP `incMod` n, mP `incMod` n) else (mP, mA `incMod` n)
 handleKey state [Shift] "s" = changeMonitors state f where
@@ -472,6 +471,7 @@ handleKey state [Control] "s" = changeMonitors state f where f mP mA n = (mP `in
 handleKey state [Shift,Control] "s" = changeMonitors state f where f mP mA n = (mP `decMod` n, mA)
 handleKey state [Alt] "s" = changeMonitors state f where f mP mA n = (mP, mA `incMod` n)
 handleKey state [Shift,Alt] "s" = changeMonitors state f where f mP mA n = (mP, mA `decMod` n)
+
 handleKey _ _ name | name `elem` [ -- Ignore modifier keys
   "shift_l", "shift_r", "control_l", "control_r", "alt_l", "alt_r",
   "super_l", "super_r", "caps_lock", "menu", "xf86wakeup"]
@@ -500,7 +500,6 @@ historyForward state = do
 toggleFullScreen state = do
   f <- readIORef (fullscreen state)
   mapM_ (if f then windowUnfullscreen else windowFullscreen) =<< mainWindows state
-  -- TODO: mixed fullscreen?
   writeIORef (fullscreen state) $ not f
 
 -- Move the divider on the preview window to the next logical division point.
@@ -879,8 +878,8 @@ displayTime state = do
 ------------------------
 
 -- Parse time entered by the user.
--- The accepted format is "-* ((\d+:)? \d+:)? \d+" but white spaces are allowed anywhere.
--- TODO: I'd really prefer to use standard code for this, but I couldn't find any
+-- The accepted format is "-* ((float :)? float :)? float" but whitespace is allowed anywhere.
+-- I'd really prefer to use standard code for this, but I couldn't find any
 parseTime :: String -> Maybe Integer{-microseconds-}
 parseTime str = go (filter (not . isSpace) str) where
   go ('-' : str) = liftM negate (go str)
