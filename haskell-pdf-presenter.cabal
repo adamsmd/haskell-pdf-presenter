@@ -24,7 +24,7 @@ Description:         The Haskell Pdf Presenter (hpdfp) is a tool for presenting 
 
                      For more information and example uses, please visit the project home page.
 
--- URL for the project homepage or repository.
+-- URL for the project homepage.
 Homepage:            http://michaeldadams.org/projects/haskell-pdf-presenter/
 
 -- The license under which the package is released.
@@ -36,8 +36,7 @@ License-file:        LICENSE
 -- The package author(s).
 Author:              Michael D. Adams
 
--- An email address to which users can send suggestions, bug reports,
--- and patches.
+-- An email address to which users can send suggestions, bug reports, and patches.
 Maintainer:          Michael D. Adams <http://michaeldadams.org/>
 
 -- A copyright notice.
@@ -47,8 +46,7 @@ Category:            Application, Graphics, Image Viewer, PDF
 
 Build-type:          Simple
 
--- Extra files to be distributed with the package, such as examples or
--- a README.
+-- Extra files to be distributed with the package, such as examples or a README.
 Extra-source-files:  README, HaskellPdfPresenter.glade, Makefile
 
 -- Constraint on the version of Cabal needed to build this package.
@@ -69,3 +67,13 @@ Executable hpdfp
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         
+
+-- URL for the project repository.
+Source-repository head
+  Type: mercurial
+  Location: http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
+
+Source-repository this
+  Type: mercurial
+  Location: http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
+  Tag: v0.2

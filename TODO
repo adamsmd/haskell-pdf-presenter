@@ -47,6 +47,25 @@ Record:
     (unneeded, "clap" to sync audio to video, advance slide to sync video to slides, hit key hard to sync audio to slides)
   + Format: time (slide|unknown key|blank|open file)
 
+{- TODO:
+-- colors for overtime, warning, and normal
+-- metadata font size
+-- start record
+-- note mode
+-- +prerender size (zero means no bound)
+-- version
+-- preview percentage
+-- +columns in preview
+-- +adjustable overtime
+-- timer stopped or playing (instead of paused) (what does this do for timer reset?)
+-- stretch vs scale
+-- ++, Option "" ["anti-screensaver"] "always", "never", "fullscreen-only" (default = fullscreen only)
+-- TODO: on full screen, pull windows to front
+-- TODO: when repaint window, need to repaint all windows (store list of windows in State)
+-- TODO: left and right mouse click for forward and backward
+-- TODO: partial full screen? full screen on other?
+-}
+
 ---
 
 Set boarder of time on even seconds

@@ -55,7 +55,7 @@ data State = State
  , timer :: IORef TimerState -- 'Maybe' for "dont" display or haven't started counting yet? Or as a seperate flag?
  , clock :: IORef ClockState
  , videoMute :: IORef VideoMuteState
- , fullscreen :: IORef Bool -- TODO: partial full screen? full screen on other?
+ , fullscreen :: IORef Bool
  , mouseTimeout :: IORef Integer
  , history :: IORef ([Int]{-back-}, [Int]{-forward-})
 
@@ -98,24 +98,6 @@ options = [
  , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]")
               "Compression level (default 1). 0 is none. 1 is fastest. 9 is best."
  ]
-
-{- TODO:
--- colors for overtime, warning, and normal
--- metadata font size
--- start record
--- note mode
--- +prerender size (zero means no bound)
--- version
--- preview percentage
--- +columns in preview
--- +adjustable overtime
--- timer stopped or playing (instead of paused) (what does this do for timer reset?)
--- stretch vs scale
--- ++, Option "" ["anti-screensaver"] "always", "never", "fullscreen-only" (default = fullscreen only)
--- TODO: on full screen, pull windows to front
--- TODO: when repaint window, need to repaint all windows (store list of windows in State)
--- TODO: left and right mouse click for forward and backward
--}
 
 ----------------
 -- Utils and constants
