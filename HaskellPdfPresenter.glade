@@ -125,9 +125,6 @@
               <placeholder/>
             </child>
             <child>
-              <placeholder/>
-            </child>
-            <child>
               <object class="GtkLabel" id="label1">
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
@@ -301,7 +298,7 @@ Escape (exit only)</property>
               <packing>
                 <property name="left_attach">4</property>
                 <property name="right_attach">5</property>
-                <property name="top_attach">7</property>
+                <property name="top_attach">8</property>
                 <property name="bottom_attach">9</property>
               </packing>
             </child>
@@ -357,8 +354,8 @@ Escape (exit only)</property>
               <packing>
                 <property name="left_attach">3</property>
                 <property name="right_attach">4</property>
-                <property name="top_attach">6</property>
-                <property name="bottom_attach">7</property>
+                <property name="top_attach">7</property>
+                <property name="bottom_attach">8</property>
               </packing>
             </child>
             <child>
@@ -371,8 +368,8 @@ Escape (exit only)</property>
               <packing>
                 <property name="left_attach">4</property>
                 <property name="right_attach">5</property>
-                <property name="top_attach">6</property>
-                <property name="bottom_attach">7</property>
+                <property name="top_attach">7</property>
+                <property name="bottom_attach">8</property>
               </packing>
             </child>
             <child>
@@ -818,6 +815,37 @@ beween monitors:</property>
                 <property name="right_attach">2</property>
                 <property name="top_attach">13</property>
                 <property name="bottom_attach">14</property>
+              </packing>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <object class="GtkLabel" id="label51">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="xalign">0</property>
+                <property name="label" translatable="yes">Close file:</property>
+              </object>
+              <packing>
+                <property name="left_attach">3</property>
+                <property name="right_attach">4</property>
+                <property name="top_attach">6</property>
+                <property name="bottom_attach">7</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkLabel" id="label52">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="xalign">0</property>
+                <property name="label" translatable="yes">Shift-Q</property>
+              </object>
+              <packing>
+                <property name="left_attach">4</property>
+                <property name="right_attach">5</property>
+                <property name="top_attach">6</property>
+                <property name="bottom_attach">7</property>
               </packing>
             </child>
           </object>

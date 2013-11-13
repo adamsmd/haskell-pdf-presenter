@@ -8,7 +8,6 @@ import qualified Data.ByteString.Unsafe as BSU
 import Data.Char (toLower, isSpace)
 import Data.IORef
 import Data.List (sort, sortBy, nub)
-import Data.List.Split (splitOn)
 import qualified Data.Map as Map
 import Data.Ord (comparing)
 import Data.Time.LocalTime
@@ -194,7 +193,7 @@ main = do
     (opts, [file], []) -> do
       mapM_ ($ state) opts
       file' <- canonicalizePath file
-      postGUIAsync (void $ openDoc state (Just $ "file://"++file'))
+      postGUIAsync (void $ openDoc state ("file://"++file'))
       guiMain state
     (_, [_,_], []) -> putStrLn "Error: Multiple files on command line" >> putStr (usageInfo header options)
     (_, _, errors) -> putStrLn (concat errors) >> putStr (usageInfo header options)
@@ -264,8 +263,8 @@ guiMain state = do
      let update = do p <- liftM round $ pageAdjustment state `get` adjustmentValue
                      n <- liftM round $ pageAdjustment state `get` adjustmentUpper
                      l <- liftM round $ pageAdjustment state `get` adjustmentLower
-                     when ((l :: Integer) /= 0) $ slideNum `set` [
-                       labelText := show (p :: Integer) ++ "/" ++ show (n :: Integer),
+                     slideNum `set` [
+                       labelText := if (l :: Integer) == 0 then "" else show (p :: Integer) ++ "/" ++ show (n :: Integer),
                        labelAttributes := [AttrSize 0 (negate 1) textSize, -- TODO: we have to do this to get the right font???
                                            AttrForeground 0 (negate 1) white]]
      pageAdjustment state `onValueChanged` update
@@ -436,7 +435,10 @@ handleKey state [Shift] "braceright" =
 handleKey state [] "equal" = panedStops state >> return True
 
 -- Files
-handleKey state [Control] "r" = readIORef (documentURL state) >>= openDoc state >> return True
+handleKey state [Shift] "q" = setDocument state makeTitle 0 0 Nothing Nothing where
+  makeTitle t = t ++ " Window - " ++ appName
+handleKey state [Control] "r" = readIORef (documentURL state) >>=
+  maybe (errorDialog "Cannot open file: No file selected" >> return False) (openDoc state) >> return True
 handleKey state [Control] "o" = openFileDialog state >> return True
 
 -- Window control
@@ -658,7 +660,7 @@ openFileDialog state = do
   dialog <- fileChooserDialogNew (Just $ "Open - " ++ appName) Nothing FileChooserActionOpen
             [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
   maybe (return ()) (void . fileChooserSetURI dialog) =<< readIORef (documentURL state)
-  loopDialog dialog (openDoc state . Just . head =<< fileChooserGetURIs dialog)
+  loopDialog dialog (openDoc state . head =<< fileChooserGetURIs dialog)
   widgetDestroy dialog
   return True
 
@@ -865,11 +867,12 @@ displayTime state = do
 parseTime :: String -> Maybe Integer{-microseconds-}
 parseTime str = go (filter (not . isSpace) str) where
   go ('-' : str) = liftM negate (go str)
-  go str = time where
-    time | Just h <- maybeRead hr, Just m <- maybeRead min, Just s <- maybeRead sec
-         = Just $ round (1000 * 1000 * (s + 60 * (m + 60 * h)) :: Double)
-         | otherwise = Nothing
-    (sec : min : hr : _) = reverse (splitOn ":" str) ++ repeat "0"
+  go str = do
+    let (sc, sc') = break (':'==) (reverse str)
+        (mn, mn') = break (':'==) (if null sc' then "0" else drop 1 sc')
+        hr = if null mn' then "0" else drop 1 mn'
+    [Just h, Just m, Just s] <- return $ map (maybeRead . reverse) [hr, mn, sc]
+    return $ round (1000 * 1000 * (s + 60 * (m + 60 * h)) :: Double)
 
 -- Format time for display to user.  Format: H:MM:SS or -H:MM:SS
 formatTime :: Integer -> String
@@ -894,27 +897,30 @@ getTime format = do
 ------------------------
 
 -- Load a new PDF document
-openDoc _ Nothing = errorDialog "Cannot open file: No file selected" >> return False
-openDoc state (Just uri) = do
+openDoc state uri = do
   doc <- catch (documentNewFromFile uri Nothing)
            (\x -> errorDialog ("Error opening \"" ++ uri ++ "\": " ++ show (x :: GError)) >> return Nothing)
   case doc of
-    Nothing -> return False -- Document failed to load
+    Nothing -> errorDialog ("Unknown error opening \"" ++ uri ++ "\"") >> return True
     Just doc -> do
       -- Use the document title or filename as the window title
       title <- doc `get` documentTitle
       let makeTitle t = (if null title then takeFileName uri else title) ++ " (" ++ t ++ " Window) - " ++ appName
-      audienceWindow state >>= (`windowSetTitle` makeTitle "Audience")
-      presenterWindow state >>= (`windowSetTitle` makeTitle "Presenter")
-      -- Ensure that the current page number is in bounds for the new document
-      -- NOTE: we increment the current page number by 0 to trigger the range clamping on pageAdjustment
-      pageAdjustment state `set` [
-        adjustmentLower := 1, adjustmentUpper :=> liftM fromIntegral (documentGetNPages doc), adjustmentValue :~ (+0)]
-      -- Save the new state and return
-      writeIORef (pages state) Map.empty
-      writeIORef (documentURL state) (Just uri)
-      writeIORef (document state) (Just doc)
-      return True
+      upper <- liftM fromIntegral (documentGetNPages doc)
+      setDocument state makeTitle 1 upper (Just uri) (Just doc)
+
+-- Set state variables for a new PDF document
+setDocument state makeTitle lower upper uri doc = do
+  audienceWindow state >>= (`windowSetTitle` makeTitle "Audience")
+  presenterWindow state >>= (`windowSetTitle` makeTitle "Presenter")
+  -- Ensure that the current page number is in bounds for the new document
+  -- NOTE: we increment the current page number by 0 to trigger the range clamping on pageAdjustment
+  pageAdjustment state `set` [adjustmentLower := lower, adjustmentUpper := upper, adjustmentValue :~ (+0)]
+  -- Save the new state and return
+  writeIORef (pages state) Map.empty
+  writeIORef (documentURL state) uri
+  writeIORef (document state) doc
+  return True
 
 -- We render in a timeout to keep the GUI responsive.  We move to a
 -- slower timeout when everything is already rendered to avoid hogging

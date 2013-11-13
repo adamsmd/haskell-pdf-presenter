@@ -113,34 +113,35 @@ Features
   (Note that the keys are far appart on a Qwerty keyboard and irreversible
   actions (e.g., resetting the timer) all use a modifier key.)
 
-  - Help/About dialog: h, ?
-  - Quit: Alt-F4, Ctrl-q
+  - Help/About dialog: H, ?
+  - Quit: Alt-F4, Ctrl-Q
   - Switching slides:
     - Forward slide and unpause (shift moves by 10): space, page down, enter, right arrow, down arrow
     - Backward slide and unpause (shift moves by 10): back space, page up, left arrow, up arrow
     - First slide: home
     - Last slide: end
-    - Goto slide number: Ctrl-g, double-click slide number
+    - Goto slide number: Ctrl-G, double-click slide number
     - History back: Alt-L, XF86Back
     - History forward: Alt-R, XF86Forward
   - Clock/timer control:
-    - Toggle pause: p, pause
-    - Toggle stop: Shift-p
-    - Reset timer: c
-    - Open timer dialog: Ctrl-c
+    - Toggle pause: P, pause
+    - Toggle stop: Shift-P
+    - Reset timer: C
+    - Open timer dialog: Ctrl-C
   - Mute:
-    - Toggle white: w
-    - Toggle black: b
+    - Toggle white: W
+    - Toggle black: B
   - Presenter screen:
-    - Switch views: tab
+    - Switch views: Tab
     - Change preview percentage: [, ], Shift-[ (minor), Shift-] (minor), = (standard stops)
       - Standard stops: 0, best-fit on left, 1/3, 1/2, 2/3, best-fit on right, 1
   - Files:
-    - Reload file: Ctrl-r
-    - Open file: Ctrl-o
+    - Reload file: Ctrl-R
+    - Open file: Ctrl-O
+    - Close file: Shift-Q
   - Window control:
-    - Enter fullscreen: f, F11, Alt-Enter, Control-l
-    - Exit fullscreen: Escape, f, F11, Alt-Enter, Control-l
+    - Enter fullscreen: F, F11, Alt-Enter, Control-L
+    - Exit fullscreen: Escape, F, F11, Alt-Enter, Control-L
     - Move between monitors: S, Shift-S (reverse)
     - Move presenter window between monitors: Ctrl-S, Shift-Ctrl-S (reverse)
     - Move audience window between monitors: Alt-S, Shift-Alt-S (reverse)
