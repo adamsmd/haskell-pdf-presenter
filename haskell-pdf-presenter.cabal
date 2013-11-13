@@ -4,24 +4,24 @@ Name:                haskell-pdf-presenter
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.2.1
+Version:             0.2.2
 
 -- A short (one-line) description of the package.
 Synopsis:            Tool for presenting PDF based presentations.
 
 -- A longer description of the package.
-Description:         The Haskell Pdf Presenter (hpdfp) is a tool for presenting PDF based
+Description:         The Haskell Pdf Presenter ("hpdfp") is a tool for presenting PDF based
                      slide shows.  It has many features and niceties for making life easier
                      for the person delivering the presentation.  For example, as a
                      presenter, it is useful to see the next slide before it is shown to
                      the audience as well as how much allotted time remains.
-
+                     .
                      There are a lot of features that may not be immediately obvious so
                      please be sure to look at the documentation.
                      For help with the command line, use the "--help" flag.
                      For help with the GUI, press the "?" key when the program is running.
-                     The README contains a terse summary of all the features.
-
+                     The "README" contains a terse summary of all the features.
+                     .
                      For more information and example uses, please visit the project home page.
 
 -- URL for the project homepage.
@@ -76,4 +76,4 @@ Source-repository head
 Source-repository this
   Type: mercurial
   Location: http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
-  Tag: v0.2.1
+  Tag: v0.2.2
