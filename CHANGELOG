@@ -1,0 +1,7 @@
+0.2.1
+	* Added support for closing files
+	* Added better time parsing
+	* Added CHANGELOG
+
+0.2
+	* Initial release
