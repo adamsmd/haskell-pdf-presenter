@@ -1,0 +1,60 @@
+Next week I will be making a public release of the Haskell Pdf
+Presenter.  Before that happens, I am releasing a special tech preview
+to close friends and colleagues.  If you have any suggestions or
+feedback before the public release, please let me know.
+
+Below is the draft announcement to be sent to the Haskell and Haskell
+Cafe mailing lists.  The Hackage link won't work yet, but you can
+access the package candidate at:
+  http://hackage.haskell.org/package/haskell-pdf-presenter-0.2/candidate
+
+--------
+
+ANNOUNCE: The Haskell Pdf Presenter (hpdfp) 0.2.1
+
+I'm pleased to announce the first public release of the the Haskell Pdf Presenter (hpdfp).
+
+Project home page:
+  http://michaeldadams.org/projects/haskell-pdf-presenter
+
+Project on Hackage:
+  http://hackage.haskell.org/package/haskell-pdf-presenter
+
+Project repository:
+  http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
+
+What is it
+==========
+The Haskell Pdf Presenter (hpdfp) is a tool for presenting PDF based
+slide shows.  For example, as a presenter, I like to see the next slide
+before it is shown to the audience as well as how much allotted time
+remains.  I was never quite satisfied with the existing tools for this,
+so I wrote my own and hpdfp is the result.
+
+Though I originally wrote it for my own use, the tool has matured over
+time, and I now wish to share it with others.  Aside from being a
+useful tool, I think hpdfp is a good example of elegance and economy
+in program design.  Despite being only a thousand lines long, this
+program is full of features that may not be obvious at first glance so
+please be sure to look at the available help.
+
+Status
+======
+I've been using this tool in my own talks for over a year now, and
+it is fairly stable and feature complete.  I've only tested it on
+Ubuntu so I don't know if it ports to other platforms.  I'd love to
+hear any field reports about how it runs on other platforms.
+
+Future Directions
+=================
+I have a long TODO list of ideas I may implement in the future, but
+most development has been driven by the practical considerations that
+I discover as a use the tool.  If you have a use case for a particular
+feature, please let me know.
+
+================
+
+Feature requests, bug reports, suggestions or feedback as well as
+contributions to the documentation or implementation are most welcome.
+
+Michael D. Adams
