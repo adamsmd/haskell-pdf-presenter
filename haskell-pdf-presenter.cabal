@@ -76,4 +76,4 @@ Source-repository head
 Source-repository this
   Type: mercurial
   Location: http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
-  Tag: v0.2
+  Tag: v0.2.1
