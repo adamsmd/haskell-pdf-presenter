@@ -15,17 +15,17 @@ ANNOUNCE: The Haskell Pdf Presenter (hpdfp) 0.2.2
 I'm pleased to announce the first public release of the the Haskell Pdf Presenter (hpdfp).
 
 Project home page:
-  http://michaeldadams.org/projects/haskell-pdf-presenter
+  http://michaeldadams.org/projects/haskell-pdf-presenter/
 
 Project on Hackage:
-  http://hackage.haskell.org/package/haskell-pdf-presenter
+  http://hackage.haskell.org/package/haskell-pdf-presenter/
 
 Project repository:
   http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
 
-What is it
+What it is
 ==========
-The Haskell Pdf Presenter (hpdfp) is a tool for presenting PDF based
+The Haskell Pdf Presenter (hpdfp) is a tool for presenting PDF-based
 slide shows.  For example, as a presenter, I like to see the next slide
 before it is shown to the audience as well as how much allotted time
 remains.  I was never quite satisfied with the existing tools for this,
@@ -49,7 +49,7 @@ Future Directions
 =================
 I have a long TODO list of ideas I may implement in the future, but
 most development has been driven by the practical considerations that
-I discover as a use the tool.  If you have a use case for a particular
+I discover as I use the tool.  If you have a use case for a particular
 feature, please let me know.
 
 ================

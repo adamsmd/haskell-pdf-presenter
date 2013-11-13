@@ -1,6 +1,10 @@
+CHANGELOG for Haskell Pdf Presenter
+========================================
+
 0.2.2
 	* Fixes to cabal meta-data
-	* Make sure all verion numbers are up to date
+	* Make sure all version numbers are up to date
+	* Spell checking and proof reading
 
 0.2.1
 	* Added support for closing files

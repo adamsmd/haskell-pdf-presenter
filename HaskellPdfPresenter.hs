@@ -10,7 +10,7 @@ import Data.IORef
 import Data.List (sort, sortBy, nub)
 import qualified Data.Map as Map
 import Data.Ord (comparing)
-import Data.Time.LocalTime
+import Data.Time.LocalTime (getCurrentTimeZone, utcToLocalTime)
 import Data.Time.Clock (getCurrentTime)
 import qualified Data.Time.Format (formatTime)
 import Foreign.Ptr (castPtr)
@@ -27,7 +27,7 @@ import System.Exit (exitSuccess, exitFailure)
 import System.FilePath (takeFileName)
 import System.Glib
 import System.Locale (defaultTimeLocale)
-import Text.Printf
+import Text.Printf (printf)
 
 data TimerState =
   Counting Integer{-starting microseconds-} Integer{-ending microseconds-} |
@@ -69,7 +69,7 @@ data State = State
  , pageAdjustment :: Adjustment
 }
 
-header = "Haskell Pdf Presenter, version 0.2.2\nUsage: hpdfp [OPTION...] file"
+header = "Haskell Pdf Presenter, version 0.2.2, <http://michaeldadams.org/projects/haskell-pdf-presenter>\nUsage: hpdfp [OPTION...] file"
 options = [
    Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
  , Option "s" ["slide"] (argOption initSlide "slide" maybeRead "INT") "Initial slide number (default 1)"
@@ -81,7 +81,7 @@ options = [
               "End time (default 0:00)"
  , Option "f" ["fullscreen"] (setOption fullscreen True) "Start in full screen mode"
  , Option "p" ["preview-percentage"] (argOption initPreviewPercentage "preview-percentage" maybeRead "INT")
-              "Initial preview percentage (default 50)"
+              "Initial preview splitter percentage (default 50)"
  , Option "" ["presenter-monitor"] (argOption initPresenterMonitor "presenter-monitor" maybeRead "INT")
               "Initial monitor for presenter window (default 0)"
  , Option "" ["audience-monitor"] (argOption initAudienceMonitor "audience-monitor" maybeRead "INT")
@@ -95,7 +95,7 @@ options = [
                   map (,pauseTimer) ["pause", "paused"] ++ map (,stopTimer) ["stop", "stopped"]) "MODE")
               "Initial timer mode: \"play\", \"pause\" (default) or \"stop\""
  , Option "" ["compression"] (argOption compression "compression" (maybeRead >=> maybeRange 0 9) "[0-9]")
-              "Compression level (default 1). 0 is none. 1 is fastest. 9 is best."
+              "Cache compression level: 0 is none, 1 is fastest (default), 9 is best"
  ]
 
 ----------------

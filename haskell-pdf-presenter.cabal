@@ -7,12 +7,12 @@ Name:                haskell-pdf-presenter
 Version:             0.2.2
 
 -- A short (one-line) description of the package.
-Synopsis:            Tool for presenting PDF based presentations.
+Synopsis:            Tool for presenting PDF-based presentations.
 
 -- A longer description of the package.
-Description:         The Haskell Pdf Presenter ("hpdfp") is a tool for presenting PDF based
-                     slide shows.  It has many features and niceties for making life easier
-                     for the person delivering the presentation.  For example, as a
+Description:         The Haskell Pdf Presenter ("hpdfp") is a tool for presenting PDF-based
+                     slide shows.  It has many features and niceties that make delivering
+                     a presentation easier.  For example, as a
                      presenter, it is useful to see the next slide before it is shown to
                      the audience as well as how much allotted time remains.
                      .

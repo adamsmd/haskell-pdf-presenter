@@ -11,7 +11,7 @@ GHC=ghc $(WARNING_FLAGS) -rtsopts
 std:
 	$(GHC) --make HaskellPdfPresenter.hs
 
-# Two stage profile build, due to template haskell not playing nice with profiling.
+# Two stage profile build, due to Template Haskell not playing nice with profiling.
 # See: http://www.haskell.org/ghc/docs/6.12.1/html/users_guide/template-haskell.html#id3029367
 prof: std
 	$(GHC) --make HaskellPdfPresenter.hs -prof -osuf p_o
