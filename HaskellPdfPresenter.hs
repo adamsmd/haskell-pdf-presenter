@@ -898,7 +898,7 @@ getTime format = do
 
 -- Load a new PDF document
 openDoc state uri = do
-  doc <- catch (documentNewFromFile uri Nothing)
+  doc <- Control.Exception.catch (documentNewFromFile uri Nothing) -- Explicit name to avoid ambiguity in GHC 7.4
            (\x -> errorDialog ("Error opening \"" ++ uri ++ "\": " ++ show (x :: GError)) >> return Nothing)
   case doc of
     Nothing -> errorDialog ("Unknown error opening \"" ++ uri ++ "\"") >> return True
