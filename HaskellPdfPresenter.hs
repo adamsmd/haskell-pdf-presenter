@@ -69,7 +69,7 @@ data State = State
  , pageAdjustment :: Adjustment
 }
 
-header = "Haskell Pdf Presenter, version 0.2.2, <http://michaeldadams.org/projects/haskell-pdf-presenter>\nUsage: hpdfp [OPTION...] file"
+header = "Haskell Pdf Presenter, version 0.2.3, <http://michaeldadams.org/projects/haskell-pdf-presenter>\nUsage: hpdfp [OPTION...] file"
 options = [
    Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
  , Option "s" ["slide"] (argOption initSlide "slide" maybeRead "INT") "Initial slide number (default 1)"
