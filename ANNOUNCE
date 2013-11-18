@@ -6,11 +6,11 @@ feedback before the public release, please let me know.
 Below is the draft announcement to be sent to the Haskell and Haskell
 Cafe mailing lists.  The Hackage link won't work yet, but you can
 access the package candidate at:
-  http://hackage.haskell.org/package/haskell-pdf-presenter-0.2.3/candidate
+  http://hackage.haskell.org/package/haskell-pdf-presenter-0.2.4/candidate
 
 --------
 
-ANNOUNCE: The Haskell Pdf Presenter (hpdfp) 0.2.3
+ANNOUNCE: The Haskell Pdf Presenter (hpdfp) 0.2.4
 
 I'm pleased to announce the first public release of the the Haskell Pdf Presenter (hpdfp).
 

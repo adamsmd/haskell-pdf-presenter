@@ -8,7 +8,7 @@
     <property name="destroy_with_parent">True</property>
     <property name="type_hint">dialog</property>
     <property name="program_name">Haskell Pdf Presenter</property>
-    <property name="version">Version 0.2.3</property>
+    <property name="version">Version 0.2.4</property>
     <property name="copyright" translatable="yes">Copyright 2012-2013, Michael D. Adams</property>
     <property name="website">http://michaeldadams.org</property>
     <property name="website_label" translatable="yes">http://michaeldadams.org</property>
@@ -37,39 +37,6 @@
             <property name="n_columns">5</property>
             <property name="column_spacing">4</property>
             <property name="row_spacing">4</property>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
-            <child>
-              <placeholder/>
-            </child>
             <child>
               <placeholder/>
             </child>
@@ -329,7 +296,7 @@ Escape (exit only)</property>
               <packing>
                 <property name="left_attach">3</property>
                 <property name="right_attach">4</property>
-                <property name="top_attach">7</property>
+                <property name="top_attach">8</property>
                 <property name="bottom_attach">9</property>
               </packing>
             </child>
@@ -569,7 +536,7 @@ Escape (exit only)</property>
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="xalign">0</property>
-                <property name="label" translatable="yes">Presenter view</property>
+                <property name="label" translatable="yes">Presenter window</property>
                 <attributes>
                   <attribute name="weight" value="bold"/>
                 </attributes>
@@ -783,7 +750,7 @@ beween monitors:</property>
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <property name="xalign">0</property>
-                <property name="label" translatable="yes">S, Shift-S (reverse)
+                <property name="label" translatable="yes">M, Shift-M (reverse)
 (w/ Ctrl = move only presenter window)
 (w/ Alt = move only audience window)</property>
               </object>
@@ -847,6 +814,39 @@ beween monitors:</property>
                 <property name="top_attach">6</property>
                 <property name="bottom_attach">7</property>
               </packing>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
             </child>
           </object>
           <packing>

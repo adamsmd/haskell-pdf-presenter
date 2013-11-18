@@ -69,7 +69,7 @@ data State = State
  , pageAdjustment :: Adjustment
 }
 
-header = "Haskell Pdf Presenter, version 0.2.3, <http://michaeldadams.org/projects/haskell-pdf-presenter>\nUsage: hpdfp [OPTION...] file"
+header = "Haskell Pdf Presenter, version 0.2.4, <http://michaeldadams.org/projects/haskell-pdf-presenter>\nUsage: hpdfp [OPTION...] file"
 options = [
    Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
  , Option "s" ["slide"] (argOption initSlide "slide" maybeRead "INT") "Initial slide number (default 1)"
@@ -420,7 +420,7 @@ handleKey state [Control] "c" = timerDialog state >> return True
 handleKey state [] "b" = modifyVideoMute state (\b -> return $ if b == MuteBlack then MuteOff else MuteBlack) >> return True
 handleKey state [] "w" = modifyVideoMute state (\b -> return $ if b == MuteWhite then MuteOff else MuteWhite) >> return True
 
--- Presenter screen
+-- Presenter window
 handleKey state [] "tab" =
   builderGetObject (builder state) castToNotebook "presenter.notebook" >>=
     (`set` [notebookCurrentPage :~ (`mod` 2) . (+ 1)]) >> return True
@@ -447,14 +447,14 @@ handleKey state [] "f" = toggleFullScreen state >> return True
 handleKey state [] "f11" = toggleFullScreen state >> return True
 handleKey state [Alt] "return" = toggleFullScreen state >> return True
 handleKey state [Control] "l" = toggleFullScreen state >> return True
-handleKey state [] "s" = changeMonitors state f where
+handleKey state [] "m" = changeMonitors state f where
   f mP mA n = if mA `incMod` n == mP then (mP `incMod` n, mP `incMod` n) else (mP, mA `incMod` n)
-handleKey state [Shift] "s" = changeMonitors state f where
+handleKey state [Shift] "m" = changeMonitors state f where
   f mP mA n = if mA == mP then (mP `decMod` n, mP `decMod` n `decMod` n) else (mP, mA `decMod` n)
-handleKey state [Control] "s" = changeMonitors state f where f mP mA n = (mP `incMod` n, mA)
-handleKey state [Shift,Control] "s" = changeMonitors state f where f mP mA n = (mP `decMod` n, mA)
-handleKey state [Alt] "s" = changeMonitors state f where f mP mA n = (mP, mA `incMod` n)
-handleKey state [Shift,Alt] "s" = changeMonitors state f where f mP mA n = (mP, mA `decMod` n)
+handleKey state [Control] "m" = changeMonitors state f where f mP mA n = (mP `incMod` n, mA)
+handleKey state [Shift,Control] "m" = changeMonitors state f where f mP mA n = (mP `decMod` n, mA)
+handleKey state [Alt] "m" = changeMonitors state f where f mP mA n = (mP, mA `incMod` n)
+handleKey state [Shift,Alt] "m" = changeMonitors state f where f mP mA n = (mP, mA `decMod` n)
 
 handleKey _ _ name | name `elem` [ -- Ignore modifier keys
   "shift_l", "shift_r", "control_l", "control_r", "alt_l", "alt_r",
@@ -522,9 +522,9 @@ panedStops state = do
 
 -- Move the windows between the available monitors according to the
 -- provided f function.  For forwards movement, the order is that we
--- always move the audience view first, but if the audience view would
--- move to the same monitor as the presenter view then we advance the
--- presenter view and also move the audience view to that monitor.
+-- always move the audience window first, but if the audience window would
+-- move to the same monitor as the presenter window then we advance the
+-- presenter window and also move the audience window to that monitor.
 changeMonitors state f = do
   wP <- presenterWindow state
   wA <- audienceWindow state

@@ -1,6 +1,11 @@
 CHANGELOG for Haskell Pdf Presenter
 ========================================
 
+0.2.4
+	* Change keybinding for changing monitors from "S" to "M"
+	* Fix positioning errors in the Glade GUI file
+	* Terminology fix: "presenter window" not "screen" or "view"
+
 0.2.3
 	* Fix compilation on GHC 7.4
 
