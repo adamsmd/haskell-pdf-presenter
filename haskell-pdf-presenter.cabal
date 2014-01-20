@@ -4,7 +4,7 @@ Name:                haskell-pdf-presenter
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.2.4
+Version:             0.2.5
 
 -- A short (one-line) description of the package.
 Synopsis:            Tool for presenting PDF-based presentations.
@@ -76,4 +76,4 @@ Source-repository head
 Source-repository this
   Type: mercurial
   Location: http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
-  Tag: v0.2.4
+  Tag: v0.2.5

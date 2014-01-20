@@ -69,7 +69,7 @@ data State = State
  , pageAdjustment :: Adjustment
 }
 
-header = "Haskell Pdf Presenter, version 0.2.4, <http://michaeldadams.org/projects/haskell-pdf-presenter>\nUsage: hpdfp [OPTION...] file"
+header = "Haskell Pdf Presenter, version 0.2.5, <http://michaeldadams.org/projects/haskell-pdf-presenter>\nUsage: hpdfp [OPTION...] file"
 options = [
    Option "h?" ["help"] (NoArg (const $ putStr (usageInfo header options) >> exitSuccess)) "Display usage message"
  , Option "s" ["slide"] (argOption initSlide "slide" maybeRead "INT") "Initial slide number (default 1)"
@@ -876,7 +876,8 @@ parseTime str = go (filter (not . isSpace) str) where
 
 -- Format time for display to user.  Format: H:MM:SS or -H:MM:SS
 formatTime :: Integer -> String
-formatTime microseconds = printf "%d:%02d:%02d" hours (abs minutes) (abs seconds) where
+formatTime microseconds = printf "%s%d:%02d:%02d" sign (abs hours) (abs minutes) (abs seconds) where
+  sign = if microseconds < 0 then "-" else ""
   ((((hours, minutes), seconds), _tenths), _) = id // 60 // 60 // 10 // (100*1000) $ microseconds
   (//) f base val = (f q, r) where (q, r) = val `quotRem` base
 

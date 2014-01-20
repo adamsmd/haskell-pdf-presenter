@@ -1,6 +1,9 @@
 CHANGELOG for Haskell Pdf Presenter
 ========================================
 
+0.2.5
+	* Fixed missing minus sign in negative times
+
 0.2.4
 	* Change keybinding for changing monitors from "S" to "M"
 	* Fix positioning errors in the Glade GUI file
