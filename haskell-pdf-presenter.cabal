@@ -59,8 +59,8 @@ Executable hpdfp
   -- Packages needed in order to build this package.
   Build-depends: base == 4.*, bytestring >= 0.9, containers >= 0.1, directory >= 1.0,
                  filepath >= 1.0, template-haskell >= 2.2, zlib == 0.5.*,
-                 old-locale, time >= 1.1.2.0,
-                 glib, poppler == 0.12.2.*, gtk >= 0.12.2, cairo
+                 old-locale, time >= 1.1.2.0, text >= 1.1.0.1,
+                 glib >= 0.13, poppler >= 0.13, gtk >= 0.13, cairo >= 0.13
   
   -- Modules not exported by this package.
   -- Other-modules:       

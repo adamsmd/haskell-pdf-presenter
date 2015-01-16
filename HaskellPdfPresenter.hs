@@ -13,6 +13,7 @@ import Data.Ord (comparing)
 import Data.Time.LocalTime (getCurrentTimeZone, utcToLocalTime)
 import Data.Time.Clock (getCurrentTime)
 import qualified Data.Time.Format (formatTime)
+import qualified Data.Text as Text (unpack)
 import Foreign.Ptr (castPtr)
 import Graphics.Rendering.Cairo
 import Graphics.UI.Gtk
@@ -282,7 +283,7 @@ guiMain state = do
            window `on` keyPressEvent $ do
              mods <- eventModifier
              name <- eventKeyName
-             b <- liftIO $ handleKey state mods (map toLower name)
+             b <- liftIO $ handleKey state mods (map toLower (Text.unpack name))
              liftIO $ mapM_ widgetQueueDraw =<< mainWindows state
              return b
            -- Redraw the window when we switch slides.  Most (though not all)
@@ -658,7 +659,7 @@ gotoSlideDialog state = do
 -- Open and run a modal file selection dialog and set load the PDF document that is selected.
 openFileDialog state = do
   dialog <- fileChooserDialogNew (Just $ "Open - " ++ appName) Nothing FileChooserActionOpen
-            [(stockOpen, ResponseOk), (stockCancel, ResponseCancel)]
+            [(Text.unpack stockOpen, ResponseOk), (Text.unpack stockCancel, ResponseCancel)]
   maybe (return ()) (void . fileChooserSetURI dialog) =<< readIORef (documentURL state)
   loopDialog dialog (openDoc state . head =<< fileChooserGetURIs dialog)
   widgetDestroy dialog
