@@ -13,6 +13,7 @@ import Data.Ord (comparing)
 import Data.Time.LocalTime (getCurrentTimeZone, utcToLocalTime)
 import Data.Time.Clock (getCurrentTime)
 import qualified Data.Time.Format (formatTime)
+import Data.Maybe
 import qualified Data.Text as Text (unpack)
 import Foreign.Ptr (castPtr)
 import Graphics.Rendering.Cairo
@@ -433,7 +434,9 @@ handleKey state [Shift] "braceleft" =
   builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ max 0 . (+(-1))]) >> return True
 handleKey state [Shift] "braceright" =
   builderGetObject (builder state) castToPaned "preview.paned" >>= (`set` [panedPosition :~ (+1)]) >> return True
-handleKey state [] "equal" = panedStops state >> return True
+handleKey state [] "equal" = panedStops True state >> return True
+handleKey state [Shift] "equal" = panedStops False state >> return True
+handleKey state [Shift] "plus" = panedStops False state >> return True
 
 -- Files
 handleKey state [Shift] "q" = setDocument state makeTitle 0 0 Nothing Nothing where
@@ -496,7 +499,7 @@ toggleFullScreen state = do
 --   - 1/3 of the way from the right
 --   - Perfectly fit the left preview
 --   - All the way to the right
-panedStops state = do
+panedStops up state = do
   -- Get the current position and size of the divider
   paned <- builderGetObject (builder state) castToPaned "preview.paned"
   maxPos <- liftM fromIntegral $ paned `get` panedMaxPosition
@@ -516,10 +519,10 @@ panedStops state = do
               maxPos - round (fromIntegral panedHeight * pageWidth2 / pageHeight2)]
   -- Store the other divisions in stops'
   let stops' = [maxPos `div` 3, maxPos `div` 2, maxPos * 2 `div` 3, maxPos]
-  -- Move to the next stop greater than the current stop.
-  paned `set` [panedPosition := case sort $ filter (> oldPos) $ stops ++ stops' of
-                                  [] -> 0 -- If no more stops, go fully left
-                                  (x:_) -> x]
+  -- Move to the next stop past the current stop
+  let nextStep d c = fromMaybe d $ listToMaybe $ -- If no more stops go to d
+                     sortBy c $ filter ((== LT) . c oldPos) $ stops ++ stops' -- Choose the best of our options
+  paned `set` [panedPosition := if up then nextStep 0 compare else nextStep maxPos (flip compare)]
 
 -- Move the windows between the available monitors according to the
 -- provided f function.  For forwards movement, the order is that we
