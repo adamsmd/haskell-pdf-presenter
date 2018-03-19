@@ -13,6 +13,7 @@ import Data.Ord (comparing)
 import Data.Time.LocalTime (getCurrentTimeZone, utcToLocalTime)
 import Data.Time.Clock (getCurrentTime)
 import qualified Data.Time.Format (formatTime)
+import Data.Time.Format (defaultTimeLocale)
 import Data.Maybe
 import qualified Data.Text as Text (unpack)
 import Foreign.Ptr (castPtr)
@@ -28,7 +29,6 @@ import System.Directory (canonicalizePath)
 import System.Exit (exitSuccess, exitFailure)
 import System.FilePath (takeFileName)
 import System.Glib
-import System.Locale (defaultTimeLocale)
 import Text.Printf (printf)
 
 data TimerState =

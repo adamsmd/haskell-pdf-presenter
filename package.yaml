@@ -1,0 +1,65 @@
+name:                haskell-pdf-presenter
+version:             0.3.0
+homepage:            "http://michaeldadams.org/projects/haskell-pdf-presenter/"
+license:             GPL-3
+license-file:        LICENSE
+author:              "Michael D. Adams"
+maintainer:          "Michael D. Adams <http://michaeldadams.org/>"
+copyright:           "(c) 2012-2018, Michael D. Adams"
+
+extra-source-files:
+- README
+- CHANGELOG
+- HaskellPdfPresenter.glade
+- Makefile
+- package.yaml
+- stack.yaml
+
+synopsis:            Tool for presenting PDF-based presentations.
+category:            Application, Graphics, Image Viewer, PDF
+
+description: |
+    The Haskell Pdf Presenter ("hpdfp") is a tool for presenting PDF-based
+    slide shows.  It has many features and niceties that make delivering
+    a presentation easier.  For example, as a
+    presenter, it is useful to see the next slide before it is shown to
+    the audience as well as how much allotted time remains.
+    .
+    There are a lot of features that may not be immediately obvious so
+    please be sure to look at the documentation.
+    For help with the command line, use the "--help" flag.
+    For help with the GUI, press the "?" key when the program is running.
+    The "README" contains a terse summary of all the features.
+    .
+    For more information and example uses, please visit the project home page.
+
+executables:
+  hpdfp:
+    main:                HaskellPdfPresenter.hs
+    dependencies:
+    - base == 4.*
+    - bytestring >= 0.9
+    - containers >= 0.1
+    - directory >= 1.0
+    - filepath >= 1.0
+    - template-haskell >= 2.2
+    - zlib == 0.5.*
+    - old-locale
+    - time >= 1.1.2.0
+    - text >= 1.1.0.1
+    - glib >= 0.13
+    - poppler >= 0.13
+    - gtk >= 0.13
+    - cairo >= 0.13
+
+# `hpack` doesn't support these :-(
+
+# -- URL for the project repository.
+# Source-repository head
+#   Type: mercurial
+#   Location: http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
+#
+# Source-repository this
+#   Type: mercurial
+#   Location: http://michaeldadams.org/repos-pub/hg/haskell-pdf-presenter/
+#   Tag: v0.2.5

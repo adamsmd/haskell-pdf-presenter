@@ -1,9 +1,4 @@
 syntax: glob
-dist/*
-libs/*
-programs/*
+.stack-work/
+haskell-pdf-presenter.cabal
 *~
-*.o
-*.p_o
-*.hp
-*.hi
