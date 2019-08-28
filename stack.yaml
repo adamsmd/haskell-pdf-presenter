@@ -1,8 +1,4 @@
-resolver: lts-11.1
+resolver: lts-12.14 # The most recent LTS with gtk instead of gi-gtk (TODO: port to gi-gtk)
 extra-deps:
-- gtk-0.14.7
-- poppler-0.14.1
-- zlib-0.5.4.2
-- Cabal-1.24.2.0
-- gio-0.13.4.1
-- process-1.4.3.0
+- poppler-0.14.2
+- Cabal-2.0.1.1

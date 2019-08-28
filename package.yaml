@@ -43,7 +43,7 @@ executables:
     - directory >= 1.0
     - filepath >= 1.0
     - template-haskell >= 2.2
-    - zlib == 0.5.*
+    - zlib >= 0.5
     - old-locale
     - time >= 1.1.2.0
     - text >= 1.1.0.1
@@ -53,6 +53,7 @@ executables:
     - cairo >= 0.13
 
 # `hpack` doesn't support these :-(
+# See https://github.com/sol/hpack/issues/171
 
 # -- URL for the project repository.
 # Source-repository head
